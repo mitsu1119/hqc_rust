@@ -6,7 +6,16 @@ pub struct GaloisField2m<const PPOLY: u16> {
     value: u16,
 }
 
-impl<const PPOLY: u16> GaloisField for GaloisField2m<PPOLY> {}
+impl<const PPOLY: u16> TryFrom<u16> for GaloisField2m<PPOLY> {
+    type Error = &'static str;
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
+
+impl<const PPOLY: u16> GaloisField for GaloisField2m<PPOLY> {
+    const SIZE: u16 = 1 << (16 - PPOLY.leading_zeros() - 1);
+}
 
 impl<const PPOLY: u16> Default for GaloisField2m<PPOLY> {
     fn default() -> Self {
@@ -15,7 +24,7 @@ impl<const PPOLY: u16> Default for GaloisField2m<PPOLY> {
 }
 
 impl<const PPOLY: u16> GaloisField2m<PPOLY> {
-    pub fn new<'a>(value: u16) -> Result<Self, &'a str> {
+    pub fn new(value: u16) -> Result<Self, &'static str> {
         if value.leading_zeros() <= PPOLY.leading_zeros() {
             Err("degree of value must be smaller than degree of primitive polynomial")
         } else {
