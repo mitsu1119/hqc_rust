@@ -66,16 +66,7 @@ impl<
     type MessageType = [Self::SymbolType; MESSAGE_LEN];
 
     fn encode(&self, message: Self::MessageType) -> Self::CodeType {
-        let res = [Self::SymbolType::zero(); CODE_LEN];
-
-        println!("{:?}", message);
-
-        for i in message {
-            print!("{}, ", i);
-        }
-        println!("");
-
-        let shifted_message = {
+        let mut shifted_message = {
             let mut res = [Self::SymbolType::zero(); CODE_LEN];
             res[..MESSAGE_LEN].copy_from_slice(&message);
             res.rotate_right(PARITY_LEN - 1);
@@ -89,15 +80,30 @@ impl<
             while res_deg >= genpoly_deg {
                 let polydeg_tmp: [Self::SymbolType; PARITY_LEN] =
                     self.genpoly_mul_table[res[res_deg].value() as usize];
+                let shifted_polydeg_tmp = {
+                    let mut res = [Self::SymbolType::zero(); CODE_LEN];
+                    res[..PARITY_LEN].copy_from_slice(&polydeg_tmp);
+                    res.rotate_right(res_deg - genpoly_deg);
+                    res
+                };
+                for i in 0..CODE_LEN {
+                    res[i] += shifted_polydeg_tmp[i];
+                }
+                res_deg = Self::poly_deg(&res);
             }
+            res
         };
+
+        for i in 0..CODE_LEN {
+            shifted_message[i] += shifted_message_mod[i];
+        }
 
         for i in shifted_message {
             print!("{}, ", i);
         }
         println!("");
 
-        res
+        shifted_message
     }
     fn decode(&self, code: Self::CodeType) -> Self::MessageType {
         [Default::default(); MESSAGE_LEN]
@@ -126,9 +132,23 @@ mod tests {
         let genpoly = coeffs.map(|x| x.try_into().unwrap());
         let rs = ReedSolomon::<PPOLY, N, K, PARITY_LEN>::new(genpoly);
 
-        rs.encode([F::new(10).unwrap(); K]);
+        let m = [
+            116, 178, 211, 82, 207, 116, 201, 52, 6, 156, 157, 231, 71, 87, 245, 5,
+        ];
+        let m_poly = m.map(|x| F::new(x).unwrap());
+        let enc = rs.encode(m_poly);
+        let hex_str = {
+            let mut s = String::new();
+            for i in 0..N {
+                s += &format!("{:02x}", enc[i].value());
+            }
+            s
+        };
 
-        panic!();
+        // from HQC-1 intermediate value
+        let res = "eda27a14973188fe613ac94fbedf1106416fb391801bbee1e2e7677430bf74b2d352cf74c934069c9de74757f505";
+
+        assert_eq!(&hex_str, res);
     }
 
     #[test]
