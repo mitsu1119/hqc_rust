@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use crate::{code::Code, util::GaloisField};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -7,12 +5,29 @@ pub struct ReedSolomon<
     SymbolType: GaloisField + Default + Copy,
     const CODE_LEN: usize,
     const MESSAGE_LEN: usize,
+    const PARITY_LEN: usize,
 > {
-    _marker: PhantomData<SymbolType>,
+    genpoly: [SymbolType; PARITY_LEN],
 }
 
-impl<SymbolType: GaloisField + Default + Copy, const CODE_LEN: usize, const MESSAGE_LEN: usize> Code
-    for ReedSolomon<SymbolType, CODE_LEN, MESSAGE_LEN>
+impl<
+    SymbolType: GaloisField + Default + Copy,
+    const CODE_LEN: usize,
+    const MESSAGE_LEN: usize,
+    const PARITY_LEN: usize,
+> ReedSolomon<SymbolType, CODE_LEN, MESSAGE_LEN, PARITY_LEN>
+{
+    fn new(genpoly: [SymbolType; PARITY_LEN]) -> Self {
+        Self { genpoly }
+    }
+}
+
+impl<
+    SymbolType: GaloisField + Default + Copy,
+    const CODE_LEN: usize,
+    const MESSAGE_LEN: usize,
+    const PARITY_LEN: usize,
+> Code for ReedSolomon<SymbolType, CODE_LEN, MESSAGE_LEN, PARITY_LEN>
 {
     const CODE_LEN: usize = CODE_LEN;
     const MESSAGE_LEN: usize = MESSAGE_LEN;
