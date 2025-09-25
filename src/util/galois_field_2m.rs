@@ -1,9 +1,20 @@
+use std::{
+    char::from_digit,
+    fmt::Display,
+    ops::{Add, AddAssign, Mul, MulAssign},
+};
+
 use crate::util::GaloisField;
-use std::ops::{Add, AddAssign, Mul, MulAssign};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct GaloisField2m<const PPOLY: u16> {
     value: u16,
+}
+
+impl<const PPOLY: u16> Display for GaloisField2m<PPOLY> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:0b}", self.value)
+    }
 }
 
 impl<const PPOLY: u16> TryFrom<u16> for GaloisField2m<PPOLY> {
@@ -15,11 +26,17 @@ impl<const PPOLY: u16> TryFrom<u16> for GaloisField2m<PPOLY> {
 
 impl<const PPOLY: u16> GaloisField for GaloisField2m<PPOLY> {
     const SIZE: u16 = 1 << (16 - PPOLY.leading_zeros() - 1);
+    fn zero() -> Self {
+        Self { value: 0 }
+    }
+    fn one() -> Self {
+        Self { value: 1 }
+    }
 }
 
 impl<const PPOLY: u16> Default for GaloisField2m<PPOLY> {
     fn default() -> Self {
-        Self { value: 0 }
+        Self::zero()
     }
 }
 

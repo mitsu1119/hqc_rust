@@ -56,17 +56,62 @@ impl<
     type CodeType = [SymbolType; CODE_LEN];
     type MessageType = [SymbolType; MESSAGE_LEN];
 
-    fn encode(message: Self::MessageType) -> Self::CodeType {
-        [Default::default(); CODE_LEN]
+    fn encode(&self, message: Self::MessageType) -> Self::CodeType {
+        let res = [SymbolType::zero(); CODE_LEN];
+
+        println!("{:?}", message);
+
+        for i in message {
+            print!("{}, ", i);
+        }
+        println!("");
+
+        let shifted_message = {
+            let mut res = [SymbolType::zero(); CODE_LEN];
+            res[..MESSAGE_LEN].copy_from_slice(&message);
+            res
+        };
+
+        for i in shifted_message {
+            print!("{}, ", i);
+        }
+        println!("");
+
+        res
     }
-    fn decode(code: Self::CodeType) -> Self::MessageType {
+    fn decode(&self, code: Self::CodeType) -> Self::MessageType {
         [Default::default(); MESSAGE_LEN]
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{code::reed_solomon::ReedSolomon, util::galois_field_2m::GaloisField2m};
+    use std::default;
+
+    use crate::{
+        code::{Code, reed_solomon::ReedSolomon},
+        util::galois_field_2m::GaloisField2m,
+    };
+
+    #[test]
+    fn encode() {
+        const PPOLY: u16 = 0b100011101;
+        const N: usize = 46;
+        const K: usize = 16;
+        const PARITY_LEN: usize = 31;
+        type F = GaloisField2m<PPOLY>;
+
+        let coeffs = [
+            89, 69, 153, 116, 176, 117, 111, 75, 73, 233, 242, 233, 65, 210, 21, 139, 103, 173, 67,
+            118, 105, 210, 174, 110, 74, 69, 228, 82, 255, 181, 1,
+        ];
+        let genpoly = coeffs.map(|x| x.try_into().unwrap());
+        let rs = ReedSolomon::<GaloisField2m<PPOLY>, N, K, PARITY_LEN>::new(genpoly);
+
+        rs.encode([F::new(10).unwrap(); K]);
+
+        panic!();
+    }
 
     #[test]
     fn genpoly_mul_table() {
@@ -74,7 +119,6 @@ mod tests {
         const N: usize = 46;
         const K: usize = 16;
         const PARITY_LEN: usize = 31;
-        let finite = GaloisField2m::<PPOLY>::new(1);
 
         let coeffs = [
             89, 69, 153, 116, 176, 117, 111, 75, 73, 233, 242, 233, 65, 210, 21, 139, 103, 173, 67,

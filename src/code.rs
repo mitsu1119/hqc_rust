@@ -7,6 +7,6 @@ pub trait Code {
     type CodeType;
     type MessageType;
 
-    fn encode(message: Self::MessageType) -> Self::CodeType;
-    fn decode(code: Self::CodeType) -> Self::MessageType;
+    fn encode(&self, message: Self::MessageType) -> Self::CodeType;
+    fn decode(&self, code: Self::CodeType) -> Self::MessageType;
 }
