@@ -1,18 +1,29 @@
-use crate::code::Code;
+use std::marker::PhantomData;
 
-pub struct ReedSolomon<const CODE_LEN: usize, const MESSAGE_LEN: usize> {}
+use crate::{code::Code, util::GaloisField};
 
-impl<const CODE_LEN: usize, const MESSAGE_LEN: usize> Code for ReedSolomon<CODE_LEN, MESSAGE_LEN> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReedSolomon<
+    SymbolType: GaloisField + Default + Copy,
+    const CODE_LEN: usize,
+    const MESSAGE_LEN: usize,
+> {
+    _marker: PhantomData<SymbolType>,
+}
+
+impl<SymbolType: GaloisField + Default + Copy, const CODE_LEN: usize, const MESSAGE_LEN: usize> Code
+    for ReedSolomon<SymbolType, CODE_LEN, MESSAGE_LEN>
+{
     const CODE_LEN: usize = CODE_LEN;
     const MESSAGE_LEN: usize = MESSAGE_LEN;
-    type SymbolType = u16;
-    type CodeType = [Self::SymbolType; CODE_LEN];
-    type MessageType = [Self::SymbolType; MESSAGE_LEN];
+    type SymbolType = SymbolType;
+    type CodeType = [SymbolType; CODE_LEN];
+    type MessageType = [SymbolType; MESSAGE_LEN];
 
     fn encode(message: Self::MessageType) -> Self::CodeType {
-        [0; CODE_LEN]
+        [Default::default(); CODE_LEN]
     }
     fn decode(code: Self::CodeType) -> Self::MessageType {
-        [0; MESSAGE_LEN]
+        [Default::default(); MESSAGE_LEN]
     }
 }

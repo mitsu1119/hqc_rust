@@ -1,6 +1,6 @@
 pub mod reed_solomon;
 
-trait Code {
+pub trait Code {
     const CODE_LEN: usize;
     const MESSAGE_LEN: usize;
     type SymbolType;

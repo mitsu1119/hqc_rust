@@ -1,8 +1,17 @@
+use crate::util::GaloisField;
 use std::ops::{Add, AddAssign, Mul, MulAssign};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct GaloisField2m<const PPOLY: u16> {
     value: u16,
+}
+
+impl<const PPOLY: u16> GaloisField for GaloisField2m<PPOLY> {}
+
+impl<const PPOLY: u16> Default for GaloisField2m<PPOLY> {
+    fn default() -> Self {
+        Self { value: 0 }
+    }
 }
 
 impl<const PPOLY: u16> GaloisField2m<PPOLY> {
@@ -90,7 +99,7 @@ impl<const PPOLY: u16> Mul for GaloisField2m<PPOLY> {
 
 #[cfg(test)]
 mod tests {
-    use crate::galois_field_2m::GaloisField2m;
+    use crate::util::galois_field_2m::GaloisField2m;
 
     #[test]
     fn add() {
