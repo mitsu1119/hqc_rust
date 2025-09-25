@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GaloisField2m<const PPOLY: u16> {
@@ -17,6 +17,34 @@ impl<const PPOLY: u16> GaloisField2m<PPOLY> {
     fn add(&mut self, rhs: Self) {
         self.value ^= rhs.value;
     }
+
+    fn xtime(&mut self) {
+        match PPOLY {
+            0 | 0b10 => {
+                self.value = 0;
+            }
+            1 | 0b11 => {}
+            _ => {
+                self.value <<= 1;
+                if ((self.value >> (16 - PPOLY.leading_zeros() - 1)) & 1) == 1 {
+                    self.value ^= PPOLY;
+                }
+            }
+        }
+    }
+
+    fn mul(&mut self, rhs: Self) {
+        match rhs.value {
+            0 => {
+                self.value = 0;
+            }
+            1 => {}
+            0b10 => {
+                self.xtime();
+            }
+            _ => {}
+        }
+    }
 }
 
 impl<const PPOLY: u16> AddAssign for GaloisField2m<PPOLY> {
@@ -30,6 +58,21 @@ impl<const PPOLY: u16> Add for GaloisField2m<PPOLY> {
     fn add(self, rhs: Self) -> Self::Output {
         let mut res = self;
         res += rhs;
+        res
+    }
+}
+
+impl<const PPOLY: u16> MulAssign for GaloisField2m<PPOLY> {
+    fn mul_assign(&mut self, rhs: Self) {
+        self.mul(rhs)
+    }
+}
+
+impl<const PPOLY: u16> Mul for GaloisField2m<PPOLY> {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        let mut res = self;
+        res *= rhs;
         res
     }
 }
@@ -62,6 +105,33 @@ mod tests {
 
         for ((x, y), r) in tests.into_iter().zip(res) {
             assert_eq!(x + y, r);
+        }
+    }
+
+    #[test]
+    fn mul() {
+        let tests = [
+            (
+                GaloisField2m::<0b100011101>::new(0b1000110).unwrap(),
+                GaloisField2m::<0b100011101>::new(0b10).unwrap(),
+            ),
+            (
+                GaloisField2m::<0b100011101>::new(0b1111).unwrap(),
+                GaloisField2m::<0b100011101>::new(0b10).unwrap(),
+            ),
+            (
+                GaloisField2m::<0b100011101>::new(0b110011).unwrap(),
+                GaloisField2m::<0b100011101>::new(0b10).unwrap(),
+            ),
+        ];
+        let res = [
+            GaloisField2m::<0b100011101>::new(0b10001100).unwrap(),
+            GaloisField2m::<0b100011101>::new(0b11110).unwrap(),
+            GaloisField2m::<0b100011101>::new(0b1100110).unwrap(),
+        ];
+
+        for ((x, y), r) in tests.into_iter().zip(res) {
+            assert_eq!(x * y, r);
         }
     }
 }
