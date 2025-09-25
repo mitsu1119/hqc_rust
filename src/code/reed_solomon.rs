@@ -1,33 +1,33 @@
 use std::fmt::Debug;
 
-use crate::{code::Code, util::GaloisField};
+use crate::{code::Code, util::galois_field_2m::GaloisField2m};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReedSolomon<
-    SymbolType: GaloisField + TryFrom<u16>,
+    const SYMBOL_FIELD_PPOLY: u16,
     const CODE_LEN: usize,
     const MESSAGE_LEN: usize,
     const PARITY_LEN: usize,
 > {
-    genpoly: [SymbolType; PARITY_LEN],
-    genpoly_mul_table: Vec<[SymbolType; PARITY_LEN]>,
+    genpoly: [<Self as Code>::SymbolType; PARITY_LEN],
+    genpoly_mul_table: Vec<[<Self as Code>::SymbolType; PARITY_LEN]>,
 }
 
 impl<
-    SymbolType: GaloisField + TryFrom<u16>,
+    const SYMBOL_FIELD_PPOLY: u16,
     const CODE_LEN: usize,
     const MESSAGE_LEN: usize,
     const PARITY_LEN: usize,
-> ReedSolomon<SymbolType, CODE_LEN, MESSAGE_LEN, PARITY_LEN>
+> ReedSolomon<SYMBOL_FIELD_PPOLY, CODE_LEN, MESSAGE_LEN, PARITY_LEN>
 {
-    pub fn new(genpoly: [SymbolType; PARITY_LEN]) -> Self
-    where
-        <SymbolType as TryFrom<u16>>::Error: Debug,
-    {
-        let mut genpoly_mul_table = vec![[Default::default(); PARITY_LEN]; SymbolType::SIZE.into()];
-        for i in 0..SymbolType::SIZE {
-            genpoly_mul_table[i as usize] =
-                Self::genpoly_mul(genpoly, SymbolType::try_from(i).expect("genpoly error"));
+    pub fn new(genpoly: [<Self as Code>::SymbolType; PARITY_LEN]) -> Self {
+        let mut genpoly_mul_table =
+            vec![[Default::default(); PARITY_LEN]; <Self as Code>::SymbolType::SIZE.into()];
+        for i in 0..<Self as Code>::SymbolType::SIZE {
+            genpoly_mul_table[i as usize] = Self::genpoly_mul(
+                genpoly,
+                <Self as Code>::SymbolType::try_from(i).expect("genpoly error"),
+            );
         }
         Self {
             genpoly,
@@ -36,28 +36,37 @@ impl<
     }
 
     fn genpoly_mul(
-        genpoly: [SymbolType; PARITY_LEN],
-        value: SymbolType,
-    ) -> [SymbolType; PARITY_LEN] {
+        genpoly: [<Self as Code>::SymbolType; PARITY_LEN],
+        value: <Self as Code>::SymbolType,
+    ) -> [<Self as Code>::SymbolType; PARITY_LEN] {
         genpoly.map(|x| x * value)
+    }
+
+    fn poly_deg(poly: &[<Self as Code>::SymbolType]) -> usize {
+        for i in (0..poly.len()).rev() {
+            if poly[i] != <Self as Code>::SymbolType::zero() {
+                return i;
+            }
+        }
+        return 0;
     }
 }
 
 impl<
-    SymbolType: GaloisField + TryFrom<u16>,
+    const SYMBOL_FIELD_PPOLY: u16,
     const CODE_LEN: usize,
     const MESSAGE_LEN: usize,
     const PARITY_LEN: usize,
-> Code for ReedSolomon<SymbolType, CODE_LEN, MESSAGE_LEN, PARITY_LEN>
+> Code for ReedSolomon<SYMBOL_FIELD_PPOLY, CODE_LEN, MESSAGE_LEN, PARITY_LEN>
 {
     const CODE_LEN: usize = CODE_LEN;
     const MESSAGE_LEN: usize = MESSAGE_LEN;
-    type SymbolType = SymbolType;
-    type CodeType = [SymbolType; CODE_LEN];
-    type MessageType = [SymbolType; MESSAGE_LEN];
+    type SymbolType = GaloisField2m<SYMBOL_FIELD_PPOLY>;
+    type CodeType = [Self::SymbolType; CODE_LEN];
+    type MessageType = [Self::SymbolType; MESSAGE_LEN];
 
     fn encode(&self, message: Self::MessageType) -> Self::CodeType {
-        let res = [SymbolType::zero(); CODE_LEN];
+        let res = [Self::SymbolType::zero(); CODE_LEN];
 
         println!("{:?}", message);
 
@@ -67,9 +76,20 @@ impl<
         println!("");
 
         let shifted_message = {
-            let mut res = [SymbolType::zero(); CODE_LEN];
+            let mut res = [Self::SymbolType::zero(); CODE_LEN];
             res[..MESSAGE_LEN].copy_from_slice(&message);
+            res.rotate_right(PARITY_LEN - 1);
             res
+        };
+
+        let shifted_message_mod = {
+            let mut res = shifted_message;
+            let mut res_deg = Self::poly_deg(&res);
+            let genpoly_deg = Self::poly_deg(&self.genpoly);
+            while res_deg >= genpoly_deg {
+                let polydeg_tmp: [Self::SymbolType; PARITY_LEN] =
+                    self.genpoly_mul_table[res[res_deg].value() as usize];
+            }
         };
 
         for i in shifted_message {
@@ -86,8 +106,6 @@ impl<
 
 #[cfg(test)]
 mod tests {
-    use std::default;
-
     use crate::{
         code::{Code, reed_solomon::ReedSolomon},
         util::galois_field_2m::GaloisField2m,
@@ -106,7 +124,7 @@ mod tests {
             118, 105, 210, 174, 110, 74, 69, 228, 82, 255, 181, 1,
         ];
         let genpoly = coeffs.map(|x| x.try_into().unwrap());
-        let rs = ReedSolomon::<GaloisField2m<PPOLY>, N, K, PARITY_LEN>::new(genpoly);
+        let rs = ReedSolomon::<PPOLY, N, K, PARITY_LEN>::new(genpoly);
 
         rs.encode([F::new(10).unwrap(); K]);
 
@@ -125,7 +143,7 @@ mod tests {
             118, 105, 210, 174, 110, 74, 69, 228, 82, 255, 181, 1,
         ];
         let genpoly = coeffs.map(|x| x.try_into().unwrap());
-        let rs = ReedSolomon::<GaloisField2m<PPOLY>, N, K, PARITY_LEN>::new(genpoly);
+        let rs = ReedSolomon::<PPOLY, N, K, PARITY_LEN>::new(genpoly);
 
         let res = [
             [

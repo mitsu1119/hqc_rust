@@ -1,10 +1,7 @@
 use std::{
-    char::from_digit,
     fmt::Display,
     ops::{Add, AddAssign, Mul, MulAssign},
 };
-
-use crate::util::GaloisField;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct GaloisField2m<const PPOLY: u16> {
@@ -24,16 +21,6 @@ impl<const PPOLY: u16> TryFrom<u16> for GaloisField2m<PPOLY> {
     }
 }
 
-impl<const PPOLY: u16> GaloisField for GaloisField2m<PPOLY> {
-    const SIZE: u16 = 1 << (16 - PPOLY.leading_zeros() - 1);
-    fn zero() -> Self {
-        Self { value: 0 }
-    }
-    fn one() -> Self {
-        Self { value: 1 }
-    }
-}
-
 impl<const PPOLY: u16> Default for GaloisField2m<PPOLY> {
     fn default() -> Self {
         Self::zero()
@@ -41,12 +28,25 @@ impl<const PPOLY: u16> Default for GaloisField2m<PPOLY> {
 }
 
 impl<const PPOLY: u16> GaloisField2m<PPOLY> {
+    pub const SIZE: u16 = 1 << (16 - PPOLY.leading_zeros() - 1);
+
     pub fn new(value: u16) -> Result<Self, &'static str> {
         if value.leading_zeros() <= PPOLY.leading_zeros() {
             Err("degree of value must be smaller than degree of primitive polynomial")
         } else {
             Ok(Self { value })
         }
+    }
+
+    pub fn zero() -> Self {
+        Self { value: 0 }
+    }
+    pub fn one() -> Self {
+        Self { value: 1 }
+    }
+
+    pub fn value(&self) -> u16 {
+        self.value
     }
 
     fn add(&mut self, rhs: Self) {
