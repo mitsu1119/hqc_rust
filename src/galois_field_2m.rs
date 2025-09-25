@@ -1,6 +1,6 @@
 use std::ops::{Add, AddAssign, Mul, MulAssign};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct GaloisField2m<const PPOLY: u16> {
     value: u16,
 }
@@ -42,7 +42,18 @@ impl<const PPOLY: u16> GaloisField2m<PPOLY> {
             0b10 => {
                 self.xtime();
             }
-            _ => {}
+            _ => {
+                let mut base = *self;
+                let mut rhs = rhs;
+                self.value = 0;
+                while rhs.value > 0 {
+                    if (rhs.value & 1) == 1 {
+                        *self += base;
+                    }
+                    base.xtime();
+                    rhs.value >>= 1;
+                }
+            }
         }
     }
 }
@@ -109,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn mul() {
+    fn xtime() {
         let tests = [
             (
                 GaloisField2m::<0b100011101>::new(0b1000110).unwrap(),
@@ -128,6 +139,33 @@ mod tests {
             GaloisField2m::<0b100011101>::new(0b10001100).unwrap(),
             GaloisField2m::<0b100011101>::new(0b11110).unwrap(),
             GaloisField2m::<0b100011101>::new(0b1100110).unwrap(),
+        ];
+
+        for ((x, y), r) in tests.into_iter().zip(res) {
+            assert_eq!(x * y, r);
+        }
+    }
+
+    #[test]
+    fn mul() {
+        let tests = [
+            (
+                GaloisField2m::<0b100011101>::new(0b111111).unwrap(),
+                GaloisField2m::<0b100011101>::new(0b110101).unwrap(),
+            ),
+            (
+                GaloisField2m::<0b100011101>::new(0b11101000).unwrap(),
+                GaloisField2m::<0b100011101>::new(0b10010110).unwrap(),
+            ),
+            (
+                GaloisField2m::<0b100011101>::new(0b10110).unwrap(),
+                GaloisField2m::<0b100011101>::new(0b11110).unwrap(),
+            ),
+        ];
+        let res = [
+            GaloisField2m::<0b100011101>::new(0b10100111).unwrap(),
+            GaloisField2m::<0b100011101>::new(0b1000001).unwrap(),
+            GaloisField2m::<0b100011101>::new(0b10111001).unwrap(),
         ];
 
         for ((x, y), r) in tests.into_iter().zip(res) {
