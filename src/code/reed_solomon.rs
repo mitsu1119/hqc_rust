@@ -1,4 +1,5 @@
-use std::{fmt::Debug, mem::swap};
+use core::error;
+use std::fmt::Debug;
 
 use crate::{code::Code, util::galois_field_2m::GaloisField2m};
 
@@ -121,13 +122,11 @@ impl<
             }
             syndromes
         };
-        println!("yey");
-        println!("{:?}", res);
         res
     }
 
     // Berlekamp-Messay's Algorithms
-    fn bm(seq: Vec<<Self as Code>::SymbolType>) {
+    fn bm(seq: Vec<<Self as Code>::SymbolType>) -> Vec<<Self as Code>::SymbolType> {
         let mut cs = vec![<Self as Code>::SymbolType::one()];
         let mut bs = cs.clone();
         let mut l: usize = 0;
@@ -160,6 +159,51 @@ impl<
                 m += 1;
             }
         }
+        cs
+    }
+
+    fn calc_error_location(&self, lambda: Vec<<Self as Code>::SymbolType>) {
+        let alpha =
+            <Self as Code>::SymbolType::one() / <Self as Code>::SymbolType::primitive_element();
+        let l = lambda.len();
+
+        // values = [lambda(1), lambda(alpha^-1), lambda(alpha^-2), ..., lambda(alpha^-(n-1))]
+        let values = {
+            let mut values = vec![<Self as Code>::SymbolType::zero(); Self::CODE_LEN];
+
+            // lambda(1)
+            for j in 0..l {
+                values[0] += lambda[j];
+            }
+
+            let mut prev_terms = lambda;
+            for i in 1..Self::CODE_LEN {
+                let mut lambda_terms = vec![<Self as Code>::SymbolType::zero(); l];
+                let mut alpha_tmp = <Self as Code>::SymbolType::one();
+                for j in 0..l {
+                    lambda_terms[j] = alpha_tmp * prev_terms[j];
+                    alpha_tmp *= alpha;
+                }
+
+                for j in 0..l {
+                    values[i] += lambda_terms[j];
+                    prev_terms[j] = lambda_terms[j];
+                }
+            }
+            values
+        };
+
+        let error_pos = {
+            let mut res = vec![];
+            for i in 0..Self::CODE_LEN {
+                if values[i] == <Self as Code>::SymbolType::zero() {
+                    res.push(i);
+                }
+            }
+            res
+        };
+
+        println!("values: {:?}", error_pos);
     }
 }
 
@@ -214,6 +258,8 @@ impl<
 
     fn decode(&self, code: Self::CodeType) -> Self::MessageType {
         let syndromes = self.calc_syndrome(code);
+        let lambda = Self::bm(syndromes);
+        self.calc_error_location(lambda);
         [Default::default(); MESSAGE_LEN]
     }
 }
@@ -279,8 +325,8 @@ mod tests {
 
         let code = rs.encode(msgpoly);
         let errors = [
-            0, 0, 165, 0, 0, 0, 0, 0, 0, 126, 170, 0, 0, 0, 0, 0, 29, 0, 0, 0, 0, 0, 27, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 17, 0, 194, 0, 180, 160, 0, 0, 0, 0, 0, 0, 0,
+            0, 1, 165, 0, 0, 0, 0, 0, 0, 126, 170, 0, 0, 0, 0, 0, 29, 0, 0, 0, 0, 0, 27, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 17, 0, 194, 0, 180, 160, 0, 0, 0, 0, 0, 0, 2,
         ];
         let code_e = code
             .into_iter()
