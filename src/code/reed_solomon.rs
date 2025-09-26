@@ -66,45 +66,86 @@ impl<
         poly.drain(1..);
     }
 
-    fn lshift_poly(
-        poly: Vec<<Self as Code>::SymbolType>,
-        u: usize,
-    ) -> Vec<<Self as Code>::SymbolType> {
+    fn lshift_poly(poly: &mut Vec<<Self as Code>::SymbolType>, u: usize) {
         let mut res = vec![<Self as Code>::SymbolType::zero(); u];
         res.extend_from_slice(&poly);
+        *poly = res;
+    }
 
-        res
+    fn add_poly(
+        poly: &mut Vec<<Self as Code>::SymbolType>,
+        rhs: &mut Vec<<Self as Code>::SymbolType>,
+    ) {
+        if poly.len() > rhs.len() {
+            rhs.resize(poly.len(), <Self as Code>::SymbolType::zero());
+        }
+        if rhs.len() > poly.len() {
+            poly.resize(rhs.len(), <Self as Code>::SymbolType::zero());
+        }
+
+        for i in 0..poly.len() {
+            poly[i] += rhs[i];
+        }
+        Self::align_poly(poly);
+    }
+
+    fn scalar_mul_poly(
+        poly: &mut Vec<<Self as Code>::SymbolType>,
+        val: <Self as Code>::SymbolType,
+    ) {
+        for i in 0..poly.len() {
+            poly[i] *= val;
+        }
+        Self::align_poly(poly);
     }
 
     // Berlekamp-Messay's Algorithms
     fn bm(seq: Vec<<Self as Code>::SymbolType>) {
-        let cs = vec![<Self as Code>::SymbolType::one()];
-        let bs = cs.clone();
-        let l: usize = 0;
+        let mut cs = vec![<Self as Code>::SymbolType::one()];
+        let mut bs = cs.clone();
+        let mut l: usize = 0;
         let mut m: usize = 1;
-        let b: usize = 1;
+        let mut b = <Self as Code>::SymbolType::one();
+
+        println!("seq:");
+        for i in 0..seq.len() {
+            print!("0b{}, ", seq[i]);
+        }
+        println!("");
 
         for n in 0..seq.len() {
             let mut d = <Self as Code>::SymbolType::zero();
-            for i in 0..l {
+            for i in 0..=l {
                 d += cs[i] * seq[n - i];
             }
 
             if d == <Self as Code>::SymbolType::zero() {
+                println!("yey");
                 m += 1;
-            } else {
+            } else if 2 * l <= n {
                 let ts = cs.clone();
+                Self::lshift_poly(&mut bs, m);
+                Self::scalar_mul_poly(&mut bs, d / b);
+                Self::add_poly(&mut cs, &mut bs);
+                l = n + 1 - l;
+                bs = ts;
+                b = d;
+                m = 1;
+            } else {
+                let ts = bs.clone();
+                Self::lshift_poly(&mut bs, m);
+                Self::scalar_mul_poly(&mut bs, d / b);
+                Self::add_poly(&mut cs, &mut bs);
+                bs = ts;
+                m += 1;
             }
         }
 
-        let mut test = vec![
-            <Self as Code>::SymbolType::one(),
-            <Self as Code>::SymbolType::one(),
-            <Self as Code>::SymbolType::zero(),
-            <Self as Code>::SymbolType::zero(),
-        ];
-        Self::align_poly(&mut test);
-        println!("{:?}", Self::lshift_poly(test, 4));
+        println!("res:");
+        for i in 0..cs.len() {
+            print!("0b{}, ", cs[i]);
+        }
+        println!("");
 
         panic!();
     }
