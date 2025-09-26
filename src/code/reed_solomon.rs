@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, mem::swap};
 
 use crate::{code::Code, util::galois_field_2m::GaloisField2m};
 
@@ -29,6 +29,7 @@ impl<
                 <Self as Code>::SymbolType::try_from(i).expect("genpoly error"),
             );
         }
+
         Self {
             genpoly,
             genpoly_mul_table,
@@ -99,6 +100,32 @@ impl<
         Self::align_poly(poly);
     }
 
+    fn calc_syndrome(&self, code: <Self as Code>::CodeType) -> Vec<<Self as Code>::SymbolType> {
+        let alpha = <Self as Code>::SymbolType::primitive_element();
+        let delta = (Self::CODE_LEN - Self::MESSAGE_LEN) / 2;
+        let res = {
+            let mut syndromes = vec![<Self as Code>::SymbolType::zero(); delta << 1];
+            let mut s_terms = code;
+            for i in 0..(delta << 1) {
+                let mut si_terms = vec![<Self as Code>::SymbolType::zero(); Self::CODE_LEN];
+                let mut alpha_tmp = <Self as Code>::SymbolType::one();
+                for j in 0..Self::CODE_LEN {
+                    si_terms[j] = alpha_tmp * s_terms[j];
+                    alpha_tmp *= alpha;
+                }
+
+                for j in 0..si_terms.len() {
+                    syndromes[i] += si_terms[j];
+                    s_terms[j] = si_terms[j];
+                }
+            }
+            syndromes
+        };
+        println!("yey");
+        println!("{:?}", res);
+        res
+    }
+
     // Berlekamp-Messay's Algorithms
     fn bm(seq: Vec<<Self as Code>::SymbolType>) {
         let mut cs = vec![<Self as Code>::SymbolType::one()];
@@ -107,12 +134,6 @@ impl<
         let mut m: usize = 1;
         let mut b = <Self as Code>::SymbolType::one();
 
-        println!("seq:");
-        for i in 0..seq.len() {
-            print!("0b{}, ", seq[i]);
-        }
-        println!("");
-
         for n in 0..seq.len() {
             let mut d = <Self as Code>::SymbolType::zero();
             for i in 0..=l {
@@ -120,7 +141,6 @@ impl<
             }
 
             if d == <Self as Code>::SymbolType::zero() {
-                println!("yey");
                 m += 1;
             } else if 2 * l <= n {
                 let ts = cs.clone();
@@ -140,14 +160,6 @@ impl<
                 m += 1;
             }
         }
-
-        println!("res:");
-        for i in 0..cs.len() {
-            print!("0b{}, ", cs[i]);
-        }
-        println!("");
-
-        panic!();
     }
 }
 
@@ -199,7 +211,9 @@ impl<
 
         shifted_message
     }
+
     fn decode(&self, code: Self::CodeType) -> Self::MessageType {
+        let syndromes = self.calc_syndrome(code);
         [Default::default(); MESSAGE_LEN]
     }
 }
@@ -260,7 +274,26 @@ mod tests {
         let genpoly = coeffs.map(|x| x.try_into().unwrap());
         let rs = ReedSolomon::<PPOLY, N, K, PARITY_LEN>::new(genpoly);
 
-        ReedSolomon::<PPOLY, N, K, PARITY_LEN>::bm(genpoly.to_vec());
+        let msg = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 11, 12, 13, 14, 15, 16];
+        let msgpoly = msg.map(|x| x.try_into().unwrap());
+
+        let code = rs.encode(msgpoly);
+        let errors = [
+            0, 0, 165, 0, 0, 0, 0, 0, 0, 126, 170, 0, 0, 0, 0, 0, 29, 0, 0, 0, 0, 0, 27, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 17, 0, 194, 0, 180, 160, 0, 0, 0, 0, 0, 0, 0,
+        ];
+        let code_e = code
+            .into_iter()
+            .zip(errors.into_iter())
+            .map(|(c, e)| c + e.try_into().unwrap())
+            .collect::<Vec<F>>()
+            .try_into()
+            .unwrap();
+
+        let decoded1 = rs.decode(code);
+        let decoded2 = rs.decode(code_e);
+
+        assert_eq!(decoded1, msgpoly);
     }
 
     #[test]

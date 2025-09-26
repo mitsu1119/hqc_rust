@@ -49,6 +49,11 @@ impl<const PPOLY: u16> GaloisField2m<PPOLY> {
         self.value
     }
 
+    pub fn primitive_element() -> Self {
+        // assumption: PPOLY is primitive
+        Self { value: 2 }
+    }
+
     fn add(&mut self, rhs: Self) {
         self.value ^= rhs.value;
     }
