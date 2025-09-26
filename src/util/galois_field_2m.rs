@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    ops::{Add, AddAssign, Mul, MulAssign},
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -91,6 +91,37 @@ impl<const PPOLY: u16> GaloisField2m<PPOLY> {
             }
         }
     }
+
+    fn inv(&mut self) {
+        // self^x = self^{-1}
+        let mut x: u16 = (1 << (16 - PPOLY.leading_zeros() - 1)) - 2;
+
+        match x {
+            0 => self.value = 1,
+            1 => {}
+            _ => {
+                let mut base = *self;
+                self.value = 1;
+                while x > 0 {
+                    if (x & 1) == 1 {
+                        *self *= base;
+                    }
+                    base *= base;
+                    x >>= 1;
+                }
+            }
+        }
+    }
+
+    fn div(&mut self, rhs: Self) {
+        assert_ne!(rhs.value, 0);
+        if rhs.value == 1 {
+            return;
+        }
+        let mut rhs = rhs;
+        rhs.inv();
+        *self *= rhs;
+    }
 }
 
 impl<const PPOLY: u16> AddAssign for GaloisField2m<PPOLY> {
@@ -119,6 +150,21 @@ impl<const PPOLY: u16> Mul for GaloisField2m<PPOLY> {
     fn mul(self, rhs: Self) -> Self::Output {
         let mut res = self;
         res *= rhs;
+        res
+    }
+}
+
+impl<const PPOLY: u16> DivAssign for GaloisField2m<PPOLY> {
+    fn div_assign(&mut self, rhs: Self) {
+        self.div(rhs);
+    }
+}
+
+impl<const PPOLY: u16> Div for GaloisField2m<PPOLY> {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
+        let mut res = self;
+        res /= rhs;
         res
     }
 }
@@ -205,6 +251,43 @@ mod tests {
 
         for ((x, y), r) in tests.into_iter().zip(res) {
             assert_eq!(x * y, r);
+        }
+    }
+
+    #[test]
+    fn div() {
+        let tests = [
+            (
+                GaloisField2m::<0b100011101>::new(0b0).unwrap(),
+                GaloisField2m::<0b100011101>::new(0b110101).unwrap(),
+            ),
+            (
+                GaloisField2m::<0b100011101>::new(0b1).unwrap(),
+                GaloisField2m::<0b100011101>::new(0b110101).unwrap(),
+            ),
+            (
+                GaloisField2m::<0b100011101>::new(0b111111).unwrap(),
+                GaloisField2m::<0b100011101>::new(0b110101).unwrap(),
+            ),
+            (
+                GaloisField2m::<0b100011101>::new(0b11101000).unwrap(),
+                GaloisField2m::<0b100011101>::new(0b10010110).unwrap(),
+            ),
+            (
+                GaloisField2m::<0b100011101>::new(0b10110).unwrap(),
+                GaloisField2m::<0b100011101>::new(0b11110).unwrap(),
+            ),
+        ];
+        let res = [
+            GaloisField2m::<0b100011101>::new(0b0).unwrap(),
+            GaloisField2m::<0b100011101>::new(0b11000011).unwrap(),
+            GaloisField2m::<0b100011101>::new(0b11001100).unwrap(),
+            GaloisField2m::<0b100011101>::new(0b10110001).unwrap(),
+            GaloisField2m::<0b100011101>::new(0b1100011).unwrap(),
+        ];
+
+        for ((x, y), r) in tests.into_iter().zip(res) {
+            assert_eq!(x / y, r);
         }
     }
 }
