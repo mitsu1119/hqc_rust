@@ -50,6 +50,64 @@ impl<
         }
         return 0;
     }
+
+    fn align_poly(poly: &mut Vec<<Self as Code>::SymbolType>) {
+        if poly.len() == 1 {
+            return;
+        }
+
+        for i in (0..poly.len()).rev() {
+            if poly[i] != <Self as Code>::SymbolType::zero() {
+                poly.drain((i + 1)..);
+                return;
+            }
+        }
+
+        poly.drain(1..);
+    }
+
+    fn lshift_poly(
+        poly: Vec<<Self as Code>::SymbolType>,
+        u: usize,
+    ) -> Vec<<Self as Code>::SymbolType> {
+        let mut res = vec![<Self as Code>::SymbolType::zero(); u];
+        res.extend_from_slice(&poly);
+
+        res
+    }
+
+    // Berlekamp-Messay's Algorithms
+    fn bm(seq: Vec<<Self as Code>::SymbolType>) {
+        let cs = vec![<Self as Code>::SymbolType::one()];
+        let bs = cs.clone();
+        let l: usize = 0;
+        let mut m: usize = 1;
+        let b: usize = 1;
+
+        for n in 0..seq.len() {
+            let mut d = <Self as Code>::SymbolType::zero();
+            for i in 0..l {
+                d += cs[i] * seq[n - i];
+            }
+
+            if d == <Self as Code>::SymbolType::zero() {
+                m += 1;
+            } else {
+                let ts = cs.clone();
+            }
+        }
+
+        let mut test = vec![
+            <Self as Code>::SymbolType::one(),
+            <Self as Code>::SymbolType::one(),
+            <Self as Code>::SymbolType::zero(),
+            <Self as Code>::SymbolType::zero(),
+        ];
+        Self::align_poly(&mut test);
+        println!("{:?}", Self::lshift_poly(test, 4));
+
+        panic!();
+    }
 }
 
 impl<
@@ -98,11 +156,6 @@ impl<
             shifted_message[i] += shifted_message_mod[i];
         }
 
-        for i in shifted_message {
-            print!("{}, ", i);
-        }
-        println!("");
-
         shifted_message
     }
     fn decode(&self, code: Self::CodeType) -> Self::MessageType {
@@ -149,6 +202,24 @@ mod tests {
         let res = "eda27a14973188fe613ac94fbedf1106416fb391801bbee1e2e7677430bf74b2d352cf74c934069c9de74757f505";
 
         assert_eq!(&hex_str, res);
+    }
+
+    #[test]
+    fn decode() {
+        const PPOLY: u16 = 0b100011101;
+        const N: usize = 46;
+        const K: usize = 16;
+        const PARITY_LEN: usize = 31;
+        type F = GaloisField2m<PPOLY>;
+
+        let coeffs = [
+            89, 69, 153, 116, 176, 117, 111, 75, 73, 233, 242, 233, 65, 210, 21, 139, 103, 173, 67,
+            118, 105, 210, 174, 110, 74, 69, 228, 82, 255, 181, 1,
+        ];
+        let genpoly = coeffs.map(|x| x.try_into().unwrap());
+        let rs = ReedSolomon::<PPOLY, N, K, PARITY_LEN>::new(genpoly);
+
+        ReedSolomon::<PPOLY, N, K, PARITY_LEN>::bm(genpoly.to_vec());
     }
 
     #[test]
