@@ -3,44 +3,43 @@ use std::fmt::Debug;
 use crate::{code::Code, util::galois_field_2m::GaloisField2m};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReedSolomon<
-    const SYMBOL_FIELD_PPOLY: u16,
-    const CODE_LEN: usize,
-    const MESSAGE_LEN: usize,
-    const PARITY_LEN: usize,
-> {
-    genpoly: [<Self as Code>::SymbolType; PARITY_LEN],
-    genpoly_mul_table: Vec<[<Self as Code>::SymbolType; PARITY_LEN]>,
+pub struct ReedSolomon<const SYMBOL_FIELD_PPOLY: u16> {
+    n: usize,
+    k: usize,
+    genpoly: Vec<<Self as Code>::SymbolType>,
+    genpoly_mul_table: Vec<Vec<<Self as Code>::SymbolType>>,
 }
 
-impl<
-    const SYMBOL_FIELD_PPOLY: u16,
-    const CODE_LEN: usize,
-    const MESSAGE_LEN: usize,
-    const PARITY_LEN: usize,
-> ReedSolomon<SYMBOL_FIELD_PPOLY, CODE_LEN, MESSAGE_LEN, PARITY_LEN>
-{
-    pub fn new(genpoly: [<Self as Code>::SymbolType; PARITY_LEN]) -> Self {
-        let mut genpoly_mul_table =
-            vec![[Default::default(); PARITY_LEN]; <Self as Code>::SymbolType::SIZE.into()];
+impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
+    pub fn new(code_len: usize, msg_len: usize, genpoly: Vec<<Self as Code>::SymbolType>) -> Self {
+        let mut genpoly_mul_table = vec![
+            vec![Default::default(); code_len - msg_len + 1];
+            <Self as Code>::SymbolType::SIZE.into()
+        ];
         for i in 0..<Self as Code>::SymbolType::SIZE {
             genpoly_mul_table[i as usize] = Self::genpoly_mul(
-                genpoly,
+                &genpoly,
                 <Self as Code>::SymbolType::try_from(i).expect("genpoly error"),
             );
         }
 
         Self {
+            n: code_len,
+            k: msg_len,
             genpoly,
             genpoly_mul_table,
         }
     }
 
     fn genpoly_mul(
-        genpoly: [<Self as Code>::SymbolType; PARITY_LEN],
+        genpoly: &Vec<<Self as Code>::SymbolType>,
         value: <Self as Code>::SymbolType,
-    ) -> [<Self as Code>::SymbolType; PARITY_LEN] {
-        genpoly.map(|x| x * value)
+    ) -> Vec<<Self as Code>::SymbolType> {
+        genpoly
+            .into_iter()
+            .map(|&x| x * value)
+            .collect::<Vec<<Self as Code>::SymbolType>>()
+            .to_vec()
     }
 
     fn poly_deg(poly: &[<Self as Code>::SymbolType]) -> usize {
@@ -126,14 +125,14 @@ impl<
 
     fn calc_syndrome(&self, code: <Self as Code>::CodeType) -> Vec<<Self as Code>::SymbolType> {
         let alpha = <Self as Code>::SymbolType::primitive_element();
-        let delta = (Self::CODE_LEN - Self::MESSAGE_LEN) / 2;
+        let delta = (self.n - self.k) / 2;
         let res = {
             let mut syndromes = vec![<Self as Code>::SymbolType::zero(); delta << 1];
             let mut s_terms = code;
             for i in 0..(delta << 1) {
-                let mut si_terms = vec![<Self as Code>::SymbolType::zero(); Self::CODE_LEN];
+                let mut si_terms = vec![<Self as Code>::SymbolType::zero(); self.n];
                 let mut alpha_tmp = <Self as Code>::SymbolType::one();
-                for j in 0..Self::CODE_LEN {
+                for j in 0..self.n {
                     si_terms[j] = alpha_tmp * s_terms[j];
                     alpha_tmp *= alpha;
                 }
@@ -192,7 +191,7 @@ impl<
 
         // values = [lambda(1), lambda(alpha^-1), lambda(alpha^-2), ..., lambda(alpha^-(n-1))]
         let values = {
-            let mut values = vec![<Self as Code>::SymbolType::zero(); Self::CODE_LEN];
+            let mut values = vec![<Self as Code>::SymbolType::zero(); self.n];
 
             // lambda(1)
             for j in 0..l {
@@ -200,7 +199,7 @@ impl<
             }
 
             let mut prev_terms = lambda;
-            for i in 1..Self::CODE_LEN {
+            for i in 1..self.n {
                 let mut lambda_terms = vec![<Self as Code>::SymbolType::zero(); l];
                 let mut alpha_tmp = <Self as Code>::SymbolType::one();
                 for j in 0..l {
@@ -218,7 +217,7 @@ impl<
 
         let error_pos = {
             let mut res = vec![];
-            for i in 0..Self::CODE_LEN {
+            for i in 0..self.n {
                 if values[i] == <Self as Code>::SymbolType::zero() {
                     res.push(i);
                 }
@@ -236,7 +235,7 @@ impl<
         lambda: &Vec<<Self as Code>::SymbolType>,
     ) -> Vec<<Self as Code>::SymbolType> {
         let omega = {
-            let delta = (Self::CODE_LEN - Self::MESSAGE_LEN) / 2;
+            let delta = (self.n - self.k) / 2;
             let mut syndromes = syndromes;
             Self::mul_mod_xm_poly(&mut syndromes, &lambda, delta << 1);
             syndromes
@@ -278,41 +277,40 @@ impl<
     }
 }
 
-impl<
-    const SYMBOL_FIELD_PPOLY: u16,
-    const CODE_LEN: usize,
-    const MESSAGE_LEN: usize,
-    const PARITY_LEN: usize,
-> Code for ReedSolomon<SYMBOL_FIELD_PPOLY, CODE_LEN, MESSAGE_LEN, PARITY_LEN>
-{
-    const CODE_LEN: usize = CODE_LEN;
-    const MESSAGE_LEN: usize = MESSAGE_LEN;
+impl<const SYMBOL_FIELD_PPOLY: u16> Code for ReedSolomon<SYMBOL_FIELD_PPOLY> {
     type SymbolType = GaloisField2m<SYMBOL_FIELD_PPOLY>;
-    type CodeType = [Self::SymbolType; CODE_LEN];
-    type MessageType = [Self::SymbolType; MESSAGE_LEN];
+    type CodeType = Vec<Self::SymbolType>;
+    type MessageType = Vec<Self::SymbolType>;
+
+    fn code_len(&self) -> usize {
+        self.n
+    }
+
+    fn message_len(&self) -> usize {
+        self.k
+    }
 
     fn encode(&self, message: Self::MessageType) -> Self::CodeType {
         let mut shifted_message = {
-            let mut res = [Self::SymbolType::zero(); CODE_LEN];
-            res[..MESSAGE_LEN].copy_from_slice(&message);
-            res.rotate_right(PARITY_LEN - 1);
+            let mut res = vec![Self::SymbolType::zero(); self.n];
+            res[..self.k].copy_from_slice(&message);
+            res.rotate_right(self.n - self.k);
             res
         };
 
         let shifted_message_mod = {
-            let mut res = shifted_message;
+            let mut res = shifted_message.clone();
             let mut res_deg = Self::poly_deg(&res);
             let genpoly_deg = Self::poly_deg(&self.genpoly);
             while res_deg >= genpoly_deg {
-                let polydeg_tmp: [Self::SymbolType; PARITY_LEN] =
-                    self.genpoly_mul_table[res[res_deg].value() as usize];
+                let polydeg_tmp = self.genpoly_mul_table[res[res_deg].value() as usize].clone();
                 let shifted_polydeg_tmp = {
-                    let mut res = [Self::SymbolType::zero(); CODE_LEN];
-                    res[..PARITY_LEN].copy_from_slice(&polydeg_tmp);
+                    let mut res = vec![Self::SymbolType::zero(); self.n];
+                    res[..(self.n - self.k + 1)].copy_from_slice(&polydeg_tmp);
                     res.rotate_right(res_deg - genpoly_deg);
                     res
                 };
-                for i in 0..CODE_LEN {
+                for i in 0..self.n {
                     res[i] += shifted_polydeg_tmp[i];
                 }
                 res_deg = Self::poly_deg(&res);
@@ -320,7 +318,7 @@ impl<
             res
         };
 
-        for i in 0..CODE_LEN {
+        for i in 0..self.n {
             shifted_message[i] += shifted_message_mod[i];
         }
 
@@ -328,7 +326,7 @@ impl<
     }
 
     fn decode(&self, code: Self::CodeType) -> Self::MessageType {
-        let syndromes = self.calc_syndrome(code);
+        let syndromes = self.calc_syndrome(code.clone());
         let lambda = Self::bm(syndromes.clone());
 
         let error_locations = self.calc_error_locations(lambda.clone());
@@ -348,8 +346,8 @@ impl<
             res
         };
 
-        let mut msg: Self::MessageType = [Self::SymbolType::zero(); MESSAGE_LEN];
-        msg.copy_from_slice(&decoded[decoded.len() - MESSAGE_LEN..]);
+        let mut msg = vec![Self::SymbolType::zero(); self.k];
+        msg.copy_from_slice(&decoded[decoded.len() - self.k..]);
 
         msg
     }
@@ -367,7 +365,6 @@ mod tests {
         const PPOLY: u16 = 0b100011101;
         const N: usize = 46;
         const K: usize = 16;
-        const PARITY_LEN: usize = 31;
         type F = GaloisField2m<PPOLY>;
 
         let coeffs = [
@@ -375,13 +372,13 @@ mod tests {
             118, 105, 210, 174, 110, 74, 69, 228, 82, 255, 181, 1,
         ];
         let genpoly = coeffs.map(|x| x.try_into().unwrap());
-        let rs = ReedSolomon::<PPOLY, N, K, PARITY_LEN>::new(genpoly);
+        let rs = ReedSolomon::<PPOLY>::new(N, K, genpoly.to_vec());
 
         let m = [
             116, 178, 211, 82, 207, 116, 201, 52, 6, 156, 157, 231, 71, 87, 245, 5,
         ];
         let m_poly = m.map(|x| F::new(x).unwrap());
-        let enc = rs.encode(m_poly);
+        let enc = rs.encode(m_poly.to_vec());
         let hex_str = {
             let mut s = String::new();
             for i in 0..N {
@@ -401,7 +398,6 @@ mod tests {
         const PPOLY: u16 = 0b100011101;
         const N: usize = 46;
         const K: usize = 16;
-        const PARITY_LEN: usize = 31;
         type F = GaloisField2m<PPOLY>;
 
         let coeffs = [
@@ -409,17 +405,18 @@ mod tests {
             118, 105, 210, 174, 110, 74, 69, 228, 82, 255, 181, 1,
         ];
         let genpoly = coeffs.map(|x| x.try_into().unwrap());
-        let rs = ReedSolomon::<PPOLY, N, K, PARITY_LEN>::new(genpoly);
+        let rs = ReedSolomon::<PPOLY>::new(N, K, genpoly.to_vec());
 
         let msg = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 11, 12, 13, 14, 15, 16];
         let msgpoly = msg.map(|x| x.try_into().unwrap());
 
-        let code = rs.encode(msgpoly);
+        let code = rs.encode(msgpoly.to_vec());
         let errors = [
             0, 1, 165, 0, 0, 0, 0, 0, 0, 126, 170, 0, 0, 0, 0, 0, 29, 0, 0, 0, 0, 0, 27, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 17, 0, 194, 0, 180, 160, 0, 0, 0, 0, 0, 0, 2,
         ];
         let code_e = code
+            .clone()
             .into_iter()
             .zip(errors.into_iter())
             .map(|(c, e)| c + e.try_into().unwrap())
@@ -439,14 +436,13 @@ mod tests {
         const PPOLY: u16 = 0b100011101;
         const N: usize = 46;
         const K: usize = 16;
-        const PARITY_LEN: usize = 31;
 
         let coeffs = [
             89, 69, 153, 116, 176, 117, 111, 75, 73, 233, 242, 233, 65, 210, 21, 139, 103, 173, 67,
             118, 105, 210, 174, 110, 74, 69, 228, 82, 255, 181, 1,
         ];
         let genpoly = coeffs.map(|x| x.try_into().unwrap());
-        let rs = ReedSolomon::<PPOLY, N, K, PARITY_LEN>::new(genpoly);
+        let rs = ReedSolomon::<PPOLY>::new(N, K, genpoly.to_vec());
 
         let res = [
             [
