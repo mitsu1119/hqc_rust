@@ -1,4 +1,3 @@
-use core::error;
 use std::fmt::Debug;
 
 use crate::{code::Code, util::galois_field_2m::GaloisField2m};
@@ -101,6 +100,30 @@ impl<
         Self::align_poly(poly);
     }
 
+    fn mul_mod_xm_poly(
+        poly_l: &mut Vec<<Self as Code>::SymbolType>,
+        poly_r: &Vec<<Self as Code>::SymbolType>,
+        m: usize,
+    ) {
+        let res = {
+            let mut res = vec![<Self as Code>::SymbolType::zero(); m];
+            for i in 0..poly_r.len() {
+                if i >= m {
+                    break;
+                }
+                for j in 0..poly_l.len() {
+                    if i + j >= m {
+                        break;
+                    }
+                    res[i + j] += poly_l[j] * poly_r[i];
+                }
+            }
+            Self::align_poly(&mut res);
+            res
+        };
+        *poly_l = res;
+    }
+
     fn calc_syndrome(&self, code: <Self as Code>::CodeType) -> Vec<<Self as Code>::SymbolType> {
         let alpha = <Self as Code>::SymbolType::primitive_element();
         let delta = (Self::CODE_LEN - Self::MESSAGE_LEN) / 2;
@@ -162,7 +185,7 @@ impl<
         cs
     }
 
-    fn calc_error_location(&self, lambda: Vec<<Self as Code>::SymbolType>) {
+    fn calc_error_locations(&self, lambda: Vec<<Self as Code>::SymbolType>) -> Vec<usize> {
         let alpha =
             <Self as Code>::SymbolType::one() / <Self as Code>::SymbolType::primitive_element();
         let l = lambda.len();
@@ -203,7 +226,55 @@ impl<
             res
         };
 
-        println!("values: {:?}", error_pos);
+        error_pos
+    }
+
+    fn calc_errors(
+        &self,
+        error_locations: &Vec<usize>,
+        syndromes: Vec<<Self as Code>::SymbolType>,
+        lambda: &Vec<<Self as Code>::SymbolType>,
+    ) -> Vec<<Self as Code>::SymbolType> {
+        let omega = {
+            let delta = (Self::CODE_LEN - Self::MESSAGE_LEN) / 2;
+            let mut syndromes = syndromes;
+            Self::mul_mod_xm_poly(&mut syndromes, &lambda, delta << 1);
+            syndromes
+        };
+        assert!(omega.len() >= lambda.len() - 1);
+
+        let alpha =
+            <Self as Code>::SymbolType::one() / <Self as Code>::SymbolType::primitive_element();
+        let mut alpha_i = <Self as Code>::SymbolType::one();
+        let mut res = vec![<Self as Code>::SymbolType::zero(); error_locations.len()];
+        for ei in 0..error_locations.len() {
+            let ind_diff = if ei == 0 {
+                error_locations[ei]
+            } else {
+                error_locations[ei] - error_locations[ei - 1]
+            };
+            for _ in 0..ind_diff {
+                alpha_i *= alpha;
+            }
+
+            // Omega(alpha_i)
+            let mut omega_value = <Self as Code>::SymbolType::zero();
+            // Lambda'(alpha_i)
+            let mut lambda_diff_value = <Self as Code>::SymbolType::zero();
+            let mut alpha_i_term = <Self as Code>::SymbolType::one();
+            for i in 0..omega.len() {
+                let omega_coeff = omega[i];
+                omega_value += omega_coeff * alpha_i_term;
+
+                if (i & 1) == 0 && lambda.len() >= i + 2 {
+                    lambda_diff_value += lambda[i + 1] * alpha_i_term;
+                }
+
+                alpha_i_term *= alpha_i;
+            }
+            res[ei] = omega_value / lambda_diff_value;
+        }
+        res
     }
 }
 
@@ -258,9 +329,29 @@ impl<
 
     fn decode(&self, code: Self::CodeType) -> Self::MessageType {
         let syndromes = self.calc_syndrome(code);
-        let lambda = Self::bm(syndromes);
-        self.calc_error_location(lambda);
-        [Default::default(); MESSAGE_LEN]
+        let lambda = Self::bm(syndromes.clone());
+
+        let error_locations = self.calc_error_locations(lambda.clone());
+        let error_num = error_locations.len();
+
+        let errors = self.calc_errors(&error_locations, syndromes, &lambda);
+        assert_eq!(errors.len(), error_num);
+
+        // decode
+        let decoded = {
+            let mut res = code;
+            for i in 0..error_num {
+                let ei = error_locations[i];
+                let error = errors[i];
+                res[ei] += error;
+            }
+            res
+        };
+
+        let mut msg: Self::MessageType = [Self::SymbolType::zero(); MESSAGE_LEN];
+        msg.copy_from_slice(&decoded[decoded.len() - MESSAGE_LEN..]);
+
+        msg
     }
 }
 
@@ -340,6 +431,7 @@ mod tests {
         let decoded2 = rs.decode(code_e);
 
         assert_eq!(decoded1, msgpoly);
+        assert_eq!(decoded2, msgpoly);
     }
 
     #[test]
