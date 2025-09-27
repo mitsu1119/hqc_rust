@@ -1,3 +1,4 @@
+pub mod hadamard;
 pub mod reed_solomon;
 
 pub trait Code {
