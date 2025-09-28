@@ -91,16 +91,13 @@ impl<'a> ReedSolomon<'a> {
     fn add_poly(
         &self,
         poly: &mut Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
-        rhs: &mut Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+        rhs: &Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
     ) {
-        if poly.len() > rhs.len() {
-            rhs.resize(poly.len(), self.symbol_field.zero());
-        }
         if rhs.len() > poly.len() {
             poly.resize(rhs.len(), self.symbol_field.zero());
         }
 
-        for i in 0..poly.len() {
+        for i in 0..rhs.len() {
             poly[i] += rhs[i];
         }
         self.align_poly(poly);
