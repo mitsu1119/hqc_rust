@@ -32,7 +32,7 @@ impl Hadamard7 {
         }
     }
 
-    pub fn decode_from_u128(&self, code: u128) -> u8 {
+    fn decode_from_u128(&self, code: u128) -> u8 {
         let mut s = [0i32; 128];
         for i in 0..16 {
             let shift = (15 - i) * 8;
