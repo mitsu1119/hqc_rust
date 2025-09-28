@@ -4,7 +4,7 @@ pub mod hadamard;
 pub mod reed_solomon;
 
 pub trait Code {
-    type SymbolType: ParentSet;
+    type SymbolType;
     type CodeType;
     type MessageType;
 
