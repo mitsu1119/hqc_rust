@@ -94,7 +94,6 @@ impl Code for Hadamard7 {
             let mut byte = 0u8;
             for j in (0u8..8).rev() {
                 let xi = (i << 3) | j;
-                println!("{}", xi);
                 let inner = ((xi & a).count_ones() & 1) as u8;
                 let ci = inner ^ b;
                 byte = (byte << 1) | ci;
