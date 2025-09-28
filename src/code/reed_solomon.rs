@@ -37,6 +37,10 @@ impl<'a> ReedSolomon<'a> {
         }
     }
 
+    pub fn symbol_field(&self) -> &'a <Self as Code>::SymbolType {
+        self.symbol_field
+    }
+
     fn genpoly_mul(
         genpoly: &Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
         value: <<Self as Code>::SymbolType as ParentSet>::ElementType<'a>,
