@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::{code::Code, util::galois_field_2m::GaloisField2mElement};
+use crate::{code::Code, util::galois_field_2m_elem::GaloisField2mElement};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReedSolomon<const SYMBOL_FIELD_PPOLY: u16> {
@@ -357,7 +357,7 @@ impl<const SYMBOL_FIELD_PPOLY: u16> Code for ReedSolomon<SYMBOL_FIELD_PPOLY> {
 mod tests {
     use crate::{
         code::{Code, reed_solomon::ReedSolomon},
-        util::galois_field_2m::GaloisField2mElement,
+        util::galois_field_2m_elem::GaloisField2mElement,
     };
 
     #[test]
