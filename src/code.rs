@@ -1,8 +1,10 @@
+use crate::util::ParentSet;
+
 pub mod hadamard;
 pub mod reed_solomon;
 
 pub trait Code {
-    type SymbolType;
+    type SymbolType: ParentSet;
     type CodeType;
     type MessageType;
 

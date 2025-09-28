@@ -1,63 +1,75 @@
 use std::fmt::Debug;
 
-use crate::{code::Code, util::galois_field_2m_elem::GaloisField2mElement};
+use crate::{
+    code::Code,
+    util::{ParentSet, galois_field_2m::GaloisField2m},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReedSolomon<const SYMBOL_FIELD_PPOLY: u16> {
+pub struct ReedSolomon<'a> {
     n: usize,
     k: usize,
-    genpoly: Vec<<Self as Code>::SymbolType>,
-    genpoly_mul_table: Vec<Vec<<Self as Code>::SymbolType>>,
+    symbol_field: &'a <Self as Code>::SymbolType,
+    genpoly: Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+    genpoly_mul_table: Vec<Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>>,
 }
 
-impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
-    pub fn new(code_len: usize, msg_len: usize, genpoly: Vec<<Self as Code>::SymbolType>) -> Self {
-        let mut genpoly_mul_table = vec![
-            vec![Default::default(); code_len - msg_len + 1];
-            <Self as Code>::SymbolType::SIZE.into()
-        ];
-        for i in 0..<Self as Code>::SymbolType::SIZE {
-            genpoly_mul_table[i as usize] = Self::genpoly_mul(
-                &genpoly,
-                <Self as Code>::SymbolType::try_from(i).expect("genpoly error"),
-            );
+impl<'a> ReedSolomon<'a> {
+    pub fn new(
+        code_len: usize,
+        msg_len: usize,
+        symbol_field: &'a <Self as Code>::SymbolType,
+        genpoly: Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+    ) -> Self {
+        let mut genpoly_mul_table =
+            vec![vec![symbol_field.zero(); code_len - msg_len + 1]; symbol_field.order().into()];
+        for i in 0..symbol_field.order() {
+            genpoly_mul_table[i as usize] =
+                Self::genpoly_mul(&genpoly, symbol_field.elem(i).expect("genpoly error"));
         }
 
         Self {
             n: code_len,
             k: msg_len,
+            symbol_field,
             genpoly,
             genpoly_mul_table,
         }
     }
 
     fn genpoly_mul(
-        genpoly: &Vec<<Self as Code>::SymbolType>,
-        value: <Self as Code>::SymbolType,
-    ) -> Vec<<Self as Code>::SymbolType> {
+        genpoly: &Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+        value: <<Self as Code>::SymbolType as ParentSet>::ElementType<'a>,
+    ) -> Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>> {
         genpoly
             .into_iter()
             .map(|&x| x * value)
-            .collect::<Vec<<Self as Code>::SymbolType>>()
+            .collect::<Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>>()
             .to_vec()
     }
 
-    fn poly_deg(poly: &[<Self as Code>::SymbolType]) -> usize {
+    fn poly_deg(
+        &self,
+        poly: &[<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>],
+    ) -> usize {
         for i in (0..poly.len()).rev() {
-            if poly[i] != <Self as Code>::SymbolType::zero() {
+            if poly[i] != self.symbol_field.zero() {
                 return i;
             }
         }
         return 0;
     }
 
-    fn align_poly(poly: &mut Vec<<Self as Code>::SymbolType>) {
+    fn align_poly(
+        &self,
+        poly: &mut Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+    ) {
         if poly.len() == 1 {
             return;
         }
 
         for i in (0..poly.len()).rev() {
-            if poly[i] != <Self as Code>::SymbolType::zero() {
+            if poly[i] != self.symbol_field.zero() {
                 poly.drain((i + 1)..);
                 return;
             }
@@ -66,46 +78,53 @@ impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
         poly.drain(1..);
     }
 
-    fn lshift_poly(poly: &mut Vec<<Self as Code>::SymbolType>, u: usize) {
-        let mut res = vec![<Self as Code>::SymbolType::zero(); u];
+    fn lshift_poly(
+        &self,
+        poly: &mut Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+        u: usize,
+    ) {
+        let mut res = vec![self.symbol_field.zero(); u];
         res.extend_from_slice(&poly);
         *poly = res;
     }
 
     fn add_poly(
-        poly: &mut Vec<<Self as Code>::SymbolType>,
-        rhs: &mut Vec<<Self as Code>::SymbolType>,
+        &self,
+        poly: &mut Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+        rhs: &mut Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
     ) {
         if poly.len() > rhs.len() {
-            rhs.resize(poly.len(), <Self as Code>::SymbolType::zero());
+            rhs.resize(poly.len(), self.symbol_field.zero());
         }
         if rhs.len() > poly.len() {
-            poly.resize(rhs.len(), <Self as Code>::SymbolType::zero());
+            poly.resize(rhs.len(), self.symbol_field.zero());
         }
 
         for i in 0..poly.len() {
             poly[i] += rhs[i];
         }
-        Self::align_poly(poly);
+        self.align_poly(poly);
     }
 
     fn scalar_mul_poly(
-        poly: &mut Vec<<Self as Code>::SymbolType>,
-        val: <Self as Code>::SymbolType,
+        &self,
+        poly: &mut Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+        val: <<Self as Code>::SymbolType as ParentSet>::ElementType<'a>,
     ) {
         for i in 0..poly.len() {
             poly[i] *= val;
         }
-        Self::align_poly(poly);
+        self.align_poly(poly);
     }
 
     fn mul_mod_xm_poly(
-        poly_l: &mut Vec<<Self as Code>::SymbolType>,
-        poly_r: &Vec<<Self as Code>::SymbolType>,
+        &self,
+        poly_l: &mut Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+        poly_r: &Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
         m: usize,
     ) {
         let res = {
-            let mut res = vec![<Self as Code>::SymbolType::zero(); m];
+            let mut res = vec![self.symbol_field.zero(); m];
             for i in 0..poly_r.len() {
                 if i >= m {
                     break;
@@ -117,21 +136,24 @@ impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
                     res[i + j] += poly_l[j] * poly_r[i];
                 }
             }
-            Self::align_poly(&mut res);
+            self.align_poly(&mut res);
             res
         };
         *poly_l = res;
     }
 
-    fn calc_syndrome(&self, code: <Self as Code>::CodeType) -> Vec<<Self as Code>::SymbolType> {
-        let alpha = <Self as Code>::SymbolType::primitive_element();
+    fn calc_syndrome(
+        &self,
+        code: <Self as Code>::CodeType,
+    ) -> Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>> {
+        let alpha = self.symbol_field.primitive_element();
         let delta = (self.n - self.k) / 2;
         let res = {
-            let mut syndromes = vec![<Self as Code>::SymbolType::zero(); delta << 1];
+            let mut syndromes = vec![self.symbol_field.zero(); delta << 1];
             let mut s_terms = code;
             for i in 0..(delta << 1) {
-                let mut si_terms = vec![<Self as Code>::SymbolType::zero(); self.n];
-                let mut alpha_tmp = <Self as Code>::SymbolType::one();
+                let mut si_terms = vec![self.symbol_field.zero(); self.n];
+                let mut alpha_tmp = self.symbol_field.one();
                 for j in 0..self.n {
                     si_terms[j] = alpha_tmp * s_terms[j];
                     alpha_tmp *= alpha;
@@ -148,35 +170,38 @@ impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
     }
 
     // Berlekamp-Messay's Algorithms
-    fn bm(seq: Vec<<Self as Code>::SymbolType>) -> Vec<<Self as Code>::SymbolType> {
-        let mut cs = vec![<Self as Code>::SymbolType::one()];
+    fn bm(
+        &self,
+        seq: Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+    ) -> Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>> {
+        let mut cs = vec![self.symbol_field.one()];
         let mut bs = cs.clone();
         let mut l: usize = 0;
         let mut m: usize = 1;
-        let mut b = <Self as Code>::SymbolType::one();
+        let mut b = self.symbol_field.one();
 
         for n in 0..seq.len() {
-            let mut d = <Self as Code>::SymbolType::zero();
+            let mut d = self.symbol_field.zero();
             for i in 0..=l {
                 d += cs[i] * seq[n - i];
             }
 
-            if d == <Self as Code>::SymbolType::zero() {
+            if d == self.symbol_field.zero() {
                 m += 1;
             } else if 2 * l <= n {
                 let ts = cs.clone();
-                Self::lshift_poly(&mut bs, m);
-                Self::scalar_mul_poly(&mut bs, d / b);
-                Self::add_poly(&mut cs, &mut bs);
+                self.lshift_poly(&mut bs, m);
+                self.scalar_mul_poly(&mut bs, d / b);
+                self.add_poly(&mut cs, &mut bs);
                 l = n + 1 - l;
                 bs = ts;
                 b = d;
                 m = 1;
             } else {
                 let ts = bs.clone();
-                Self::lshift_poly(&mut bs, m);
-                Self::scalar_mul_poly(&mut bs, d / b);
-                Self::add_poly(&mut cs, &mut bs);
+                self.lshift_poly(&mut bs, m);
+                self.scalar_mul_poly(&mut bs, d / b);
+                self.add_poly(&mut cs, &mut bs);
                 bs = ts;
                 m += 1;
             }
@@ -184,14 +209,16 @@ impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
         cs
     }
 
-    fn calc_error_locations(&self, lambda: Vec<<Self as Code>::SymbolType>) -> Vec<usize> {
-        let alpha =
-            <Self as Code>::SymbolType::one() / <Self as Code>::SymbolType::primitive_element();
+    fn calc_error_locations(
+        &self,
+        lambda: Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+    ) -> Vec<usize> {
+        let alpha = self.symbol_field.one() / self.symbol_field.primitive_element();
         let l = lambda.len();
 
         // values = [lambda(1), lambda(alpha^-1), lambda(alpha^-2), ..., lambda(alpha^-(n-1))]
         let values = {
-            let mut values = vec![<Self as Code>::SymbolType::zero(); self.n];
+            let mut values = vec![self.symbol_field.zero(); self.n];
 
             // lambda(1)
             for j in 0..l {
@@ -200,8 +227,8 @@ impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
 
             let mut prev_terms = lambda;
             for i in 1..self.n {
-                let mut lambda_terms = vec![<Self as Code>::SymbolType::zero(); l];
-                let mut alpha_tmp = <Self as Code>::SymbolType::one();
+                let mut lambda_terms = vec![self.symbol_field.zero(); l];
+                let mut alpha_tmp = self.symbol_field.one();
                 for j in 0..l {
                     lambda_terms[j] = alpha_tmp * prev_terms[j];
                     alpha_tmp *= alpha;
@@ -218,7 +245,7 @@ impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
         let error_pos = {
             let mut res = vec![];
             for i in 0..self.n {
-                if values[i] == <Self as Code>::SymbolType::zero() {
+                if values[i] == self.symbol_field.zero() {
                     res.push(i);
                 }
             }
@@ -231,21 +258,20 @@ impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
     fn calc_errors(
         &self,
         error_locations: &Vec<usize>,
-        syndromes: Vec<<Self as Code>::SymbolType>,
-        lambda: &Vec<<Self as Code>::SymbolType>,
-    ) -> Vec<<Self as Code>::SymbolType> {
+        syndromes: Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+        lambda: &Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>>,
+    ) -> Vec<<<Self as Code>::SymbolType as ParentSet>::ElementType<'a>> {
         let omega = {
             let delta = (self.n - self.k) / 2;
             let mut syndromes = syndromes;
-            Self::mul_mod_xm_poly(&mut syndromes, &lambda, delta << 1);
+            self.mul_mod_xm_poly(&mut syndromes, &lambda, delta << 1);
             syndromes
         };
         assert!(omega.len() >= lambda.len() - 1);
 
-        let alpha =
-            <Self as Code>::SymbolType::one() / <Self as Code>::SymbolType::primitive_element();
-        let mut alpha_i = <Self as Code>::SymbolType::one();
-        let mut res = vec![<Self as Code>::SymbolType::zero(); error_locations.len()];
+        let alpha = self.symbol_field.one() / self.symbol_field.primitive_element();
+        let mut alpha_i = self.symbol_field.one();
+        let mut res = vec![self.symbol_field.zero(); error_locations.len()];
         for ei in 0..error_locations.len() {
             let ind_diff = if ei == 0 {
                 error_locations[ei]
@@ -257,10 +283,10 @@ impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
             }
 
             // Omega(alpha_i)
-            let mut omega_value = <Self as Code>::SymbolType::zero();
+            let mut omega_value = self.symbol_field.zero();
             // Lambda'(alpha_i)
-            let mut lambda_diff_value = <Self as Code>::SymbolType::zero();
-            let mut alpha_i_term = <Self as Code>::SymbolType::one();
+            let mut lambda_diff_value = self.symbol_field.zero();
+            let mut alpha_i_term = self.symbol_field.one();
             for i in 0..omega.len() {
                 let omega_coeff = omega[i];
                 omega_value += omega_coeff * alpha_i_term;
@@ -277,10 +303,10 @@ impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
     }
 }
 
-impl<const SYMBOL_FIELD_PPOLY: u16> Code for ReedSolomon<SYMBOL_FIELD_PPOLY> {
-    type SymbolType = GaloisField2mElement<SYMBOL_FIELD_PPOLY>;
-    type CodeType = Vec<Self::SymbolType>;
-    type MessageType = Vec<Self::SymbolType>;
+impl<'a> Code for ReedSolomon<'a> {
+    type SymbolType = GaloisField2m<'a>;
+    type CodeType = Vec<<Self::SymbolType as ParentSet>::ElementType<'a>>;
+    type MessageType = Vec<<Self::SymbolType as ParentSet>::ElementType<'a>>;
 
     fn code_len(&self) -> usize {
         self.n
@@ -292,7 +318,7 @@ impl<const SYMBOL_FIELD_PPOLY: u16> Code for ReedSolomon<SYMBOL_FIELD_PPOLY> {
 
     fn encode(&self, message: Self::MessageType) -> Self::CodeType {
         let mut shifted_message = {
-            let mut res = vec![Self::SymbolType::zero(); self.n];
+            let mut res = vec![self.symbol_field.zero(); self.n];
             res[..self.k].copy_from_slice(&message);
             res.rotate_right(self.n - self.k);
             res
@@ -300,12 +326,12 @@ impl<const SYMBOL_FIELD_PPOLY: u16> Code for ReedSolomon<SYMBOL_FIELD_PPOLY> {
 
         let shifted_message_mod = {
             let mut res = shifted_message.clone();
-            let mut res_deg = Self::poly_deg(&res);
-            let genpoly_deg = Self::poly_deg(&self.genpoly);
+            let mut res_deg = self.poly_deg(&res);
+            let genpoly_deg = self.poly_deg(&self.genpoly);
             while res_deg >= genpoly_deg {
                 let polydeg_tmp = self.genpoly_mul_table[res[res_deg].value() as usize].clone();
                 let shifted_polydeg_tmp = {
-                    let mut res = vec![Self::SymbolType::zero(); self.n];
+                    let mut res = vec![self.symbol_field.zero(); self.n];
                     res[..(self.n - self.k + 1)].copy_from_slice(&polydeg_tmp);
                     res.rotate_right(res_deg - genpoly_deg);
                     res
@@ -313,7 +339,7 @@ impl<const SYMBOL_FIELD_PPOLY: u16> Code for ReedSolomon<SYMBOL_FIELD_PPOLY> {
                 for i in 0..self.n {
                     res[i] += shifted_polydeg_tmp[i];
                 }
-                res_deg = Self::poly_deg(&res);
+                res_deg = self.poly_deg(&res);
             }
             res
         };
@@ -327,7 +353,7 @@ impl<const SYMBOL_FIELD_PPOLY: u16> Code for ReedSolomon<SYMBOL_FIELD_PPOLY> {
 
     fn decode(&self, code: Self::CodeType) -> Self::MessageType {
         let syndromes = self.calc_syndrome(code.clone());
-        let lambda = Self::bm(syndromes.clone());
+        let lambda = self.bm(syndromes.clone());
 
         let error_locations = self.calc_error_locations(lambda.clone());
         let error_num = error_locations.len();
@@ -346,7 +372,7 @@ impl<const SYMBOL_FIELD_PPOLY: u16> Code for ReedSolomon<SYMBOL_FIELD_PPOLY> {
             res
         };
 
-        let mut msg = vec![Self::SymbolType::zero(); self.k];
+        let mut msg = vec![self.symbol_field.zero(); self.k];
         msg.copy_from_slice(&decoded[decoded.len() - self.k..]);
 
         msg
@@ -357,7 +383,7 @@ impl<const SYMBOL_FIELD_PPOLY: u16> Code for ReedSolomon<SYMBOL_FIELD_PPOLY> {
 mod tests {
     use crate::{
         code::{Code, reed_solomon::ReedSolomon},
-        util::galois_field_2m_elem::GaloisField2mElement,
+        util::{galois_field_2m::GaloisField2m, galois_field_2m_elem::GaloisField2mElement},
     };
 
     #[test]
@@ -365,19 +391,20 @@ mod tests {
         const PPOLY: u16 = 0b100011101;
         const N: usize = 46;
         const K: usize = 16;
-        type F = GaloisField2mElement<PPOLY>;
+
+        let field = GaloisField2m::new(PPOLY).unwrap();
 
         let coeffs = [
             89, 69, 153, 116, 176, 117, 111, 75, 73, 233, 242, 233, 65, 210, 21, 139, 103, 173, 67,
             118, 105, 210, 174, 110, 74, 69, 228, 82, 255, 181, 1,
         ];
-        let genpoly = coeffs.map(|x| x.try_into().unwrap());
-        let rs = ReedSolomon::<PPOLY>::new(N, K, genpoly.to_vec());
+        let genpoly = coeffs.map(|x| field.elem(x).unwrap());
+        let rs = ReedSolomon::new(N, K, &field, genpoly.to_vec());
 
         let m = [
             116, 178, 211, 82, 207, 116, 201, 52, 6, 156, 157, 231, 71, 87, 245, 5,
         ];
-        let m_poly = m.map(|x| F::new(x).unwrap());
+        let m_poly = m.map(|x| field.elem(x).unwrap());
         let enc = rs.encode(m_poly.to_vec());
         let hex_str = {
             let mut s = String::new();
@@ -398,17 +425,19 @@ mod tests {
         const PPOLY: u16 = 0b100011101;
         const N: usize = 46;
         const K: usize = 16;
-        type F = GaloisField2mElement<PPOLY>;
+        type F<'a> = GaloisField2mElement<'a>;
+
+        let field = GaloisField2m::new(PPOLY).unwrap();
 
         let coeffs = [
             89, 69, 153, 116, 176, 117, 111, 75, 73, 233, 242, 233, 65, 210, 21, 139, 103, 173, 67,
             118, 105, 210, 174, 110, 74, 69, 228, 82, 255, 181, 1,
         ];
-        let genpoly = coeffs.map(|x| x.try_into().unwrap());
-        let rs = ReedSolomon::<PPOLY>::new(N, K, genpoly.to_vec());
+        let genpoly = coeffs.map(|x| field.elem(x).unwrap());
+        let rs = ReedSolomon::new(N, K, &field, genpoly.to_vec());
 
         let msg = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 11, 12, 13, 14, 15, 16];
-        let msgpoly = msg.map(|x| x.try_into().unwrap());
+        let msgpoly = msg.map(|x| field.elem(x).unwrap());
 
         let code = rs.encode(msgpoly.to_vec());
         let errors = [
@@ -419,7 +448,7 @@ mod tests {
             .clone()
             .into_iter()
             .zip(errors.into_iter())
-            .map(|(c, e)| c + e.try_into().unwrap())
+            .map(|(c, e)| c + field.elem(e).unwrap())
             .collect::<Vec<F>>()
             .try_into()
             .unwrap();
@@ -437,12 +466,14 @@ mod tests {
         const N: usize = 46;
         const K: usize = 16;
 
+        let field = GaloisField2m::new(PPOLY).unwrap();
+
         let coeffs = [
             89, 69, 153, 116, 176, 117, 111, 75, 73, 233, 242, 233, 65, 210, 21, 139, 103, 173, 67,
             118, 105, 210, 174, 110, 74, 69, 228, 82, 255, 181, 1,
         ];
-        let genpoly = coeffs.map(|x| x.try_into().unwrap());
-        let rs = ReedSolomon::<PPOLY>::new(N, K, genpoly.to_vec());
+        let genpoly = coeffs.map(|x| field.elem(x).unwrap());
+        let rs = ReedSolomon::new(N, K, &field, genpoly.to_vec());
 
         let res = [
             [
@@ -1473,7 +1504,7 @@ mod tests {
 
         for (x, r) in rs.genpoly_mul_table.into_iter().zip(res) {
             for (xx, rr) in x.into_iter().zip(r.into_iter()) {
-                assert_eq!(xx, GaloisField2mElement::<PPOLY>::new(rr).unwrap());
+                assert_eq!(xx, field.elem(rr).unwrap());
             }
         }
     }
