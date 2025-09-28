@@ -6,7 +6,7 @@ use crate::code::Code;
 pub struct Hadamard7;
 
 impl Hadamard7 {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 

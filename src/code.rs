@@ -1,3 +1,4 @@
+pub mod duplicated_hadamard;
 pub mod hadamard;
 pub mod reed_solomon;
 
