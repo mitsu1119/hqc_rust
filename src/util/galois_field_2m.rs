@@ -4,30 +4,30 @@ use std::{
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct GaloisField2m<const PPOLY: u16> {
+pub struct GaloisField2mElement<const PPOLY: u16> {
     value: u16,
 }
 
-impl<const PPOLY: u16> Display for GaloisField2m<PPOLY> {
+impl<const PPOLY: u16> Display for GaloisField2mElement<PPOLY> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:0b}", self.value)
     }
 }
 
-impl<const PPOLY: u16> TryFrom<u16> for GaloisField2m<PPOLY> {
+impl<const PPOLY: u16> TryFrom<u16> for GaloisField2mElement<PPOLY> {
     type Error = &'static str;
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         Self::new(value)
     }
 }
 
-impl<const PPOLY: u16> Default for GaloisField2m<PPOLY> {
+impl<const PPOLY: u16> Default for GaloisField2mElement<PPOLY> {
     fn default() -> Self {
         Self::zero()
     }
 }
 
-impl<const PPOLY: u16> GaloisField2m<PPOLY> {
+impl<const PPOLY: u16> GaloisField2mElement<PPOLY> {
     pub const SIZE: u16 = 1 << (16 - PPOLY.leading_zeros() - 1);
 
     pub fn new(value: u16) -> Result<Self, &'static str> {
@@ -129,13 +129,13 @@ impl<const PPOLY: u16> GaloisField2m<PPOLY> {
     }
 }
 
-impl<const PPOLY: u16> AddAssign for GaloisField2m<PPOLY> {
+impl<const PPOLY: u16> AddAssign for GaloisField2mElement<PPOLY> {
     fn add_assign(&mut self, rhs: Self) {
         self.add(rhs)
     }
 }
 
-impl<const PPOLY: u16> Add for GaloisField2m<PPOLY> {
+impl<const PPOLY: u16> Add for GaloisField2mElement<PPOLY> {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         let mut res = self;
@@ -144,13 +144,13 @@ impl<const PPOLY: u16> Add for GaloisField2m<PPOLY> {
     }
 }
 
-impl<const PPOLY: u16> MulAssign for GaloisField2m<PPOLY> {
+impl<const PPOLY: u16> MulAssign for GaloisField2mElement<PPOLY> {
     fn mul_assign(&mut self, rhs: Self) {
         self.mul(rhs)
     }
 }
 
-impl<const PPOLY: u16> Mul for GaloisField2m<PPOLY> {
+impl<const PPOLY: u16> Mul for GaloisField2mElement<PPOLY> {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
         let mut res = self;
@@ -159,13 +159,13 @@ impl<const PPOLY: u16> Mul for GaloisField2m<PPOLY> {
     }
 }
 
-impl<const PPOLY: u16> DivAssign for GaloisField2m<PPOLY> {
+impl<const PPOLY: u16> DivAssign for GaloisField2mElement<PPOLY> {
     fn div_assign(&mut self, rhs: Self) {
         self.div(rhs);
     }
 }
 
-impl<const PPOLY: u16> Div for GaloisField2m<PPOLY> {
+impl<const PPOLY: u16> Div for GaloisField2mElement<PPOLY> {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
         let mut res = self;
@@ -176,28 +176,28 @@ impl<const PPOLY: u16> Div for GaloisField2m<PPOLY> {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::galois_field_2m::GaloisField2m;
+    use crate::util::galois_field_2m::GaloisField2mElement;
 
     #[test]
     fn add() {
         let tests = [
             (
-                GaloisField2m::<0b100011101>::new(0b11).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b111).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b11).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b111).unwrap(),
             ),
             (
-                GaloisField2m::<0b100011101>::new(0b11001).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b10111).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b11001).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b10111).unwrap(),
             ),
             (
-                GaloisField2m::<0b100011101>::new(0b10000).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b100000).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b10000).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b100000).unwrap(),
             ),
         ];
         let res = [
-            GaloisField2m::<0b100011101>::new(0b100).unwrap(),
-            GaloisField2m::<0b100011101>::new(0b1110).unwrap(),
-            GaloisField2m::<0b100011101>::new(0b110000).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b100).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b1110).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b110000).unwrap(),
         ];
 
         for ((x, y), r) in tests.into_iter().zip(res) {
@@ -209,22 +209,22 @@ mod tests {
     fn xtime() {
         let tests = [
             (
-                GaloisField2m::<0b100011101>::new(0b1000110).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b10).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b1000110).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b10).unwrap(),
             ),
             (
-                GaloisField2m::<0b100011101>::new(0b1111).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b10).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b1111).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b10).unwrap(),
             ),
             (
-                GaloisField2m::<0b100011101>::new(0b110011).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b10).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b110011).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b10).unwrap(),
             ),
         ];
         let res = [
-            GaloisField2m::<0b100011101>::new(0b10001100).unwrap(),
-            GaloisField2m::<0b100011101>::new(0b11110).unwrap(),
-            GaloisField2m::<0b100011101>::new(0b1100110).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b10001100).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b11110).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b1100110).unwrap(),
         ];
 
         for ((x, y), r) in tests.into_iter().zip(res) {
@@ -236,22 +236,22 @@ mod tests {
     fn mul() {
         let tests = [
             (
-                GaloisField2m::<0b100011101>::new(0b111111).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b110101).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b111111).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b110101).unwrap(),
             ),
             (
-                GaloisField2m::<0b100011101>::new(0b11101000).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b10010110).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b11101000).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b10010110).unwrap(),
             ),
             (
-                GaloisField2m::<0b100011101>::new(0b10110).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b11110).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b10110).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b11110).unwrap(),
             ),
         ];
         let res = [
-            GaloisField2m::<0b100011101>::new(0b10100111).unwrap(),
-            GaloisField2m::<0b100011101>::new(0b1000001).unwrap(),
-            GaloisField2m::<0b100011101>::new(0b10111001).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b10100111).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b1000001).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b10111001).unwrap(),
         ];
 
         for ((x, y), r) in tests.into_iter().zip(res) {
@@ -263,32 +263,32 @@ mod tests {
     fn div() {
         let tests = [
             (
-                GaloisField2m::<0b100011101>::new(0b0).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b110101).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b0).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b110101).unwrap(),
             ),
             (
-                GaloisField2m::<0b100011101>::new(0b1).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b110101).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b1).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b110101).unwrap(),
             ),
             (
-                GaloisField2m::<0b100011101>::new(0b111111).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b110101).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b111111).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b110101).unwrap(),
             ),
             (
-                GaloisField2m::<0b100011101>::new(0b11101000).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b10010110).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b11101000).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b10010110).unwrap(),
             ),
             (
-                GaloisField2m::<0b100011101>::new(0b10110).unwrap(),
-                GaloisField2m::<0b100011101>::new(0b11110).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b10110).unwrap(),
+                GaloisField2mElement::<0b100011101>::new(0b11110).unwrap(),
             ),
         ];
         let res = [
-            GaloisField2m::<0b100011101>::new(0b0).unwrap(),
-            GaloisField2m::<0b100011101>::new(0b11000011).unwrap(),
-            GaloisField2m::<0b100011101>::new(0b11001100).unwrap(),
-            GaloisField2m::<0b100011101>::new(0b10110001).unwrap(),
-            GaloisField2m::<0b100011101>::new(0b1100011).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b0).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b11000011).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b11001100).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b10110001).unwrap(),
+            GaloisField2mElement::<0b100011101>::new(0b1100011).unwrap(),
         ];
 
         for ((x, y), r) in tests.into_iter().zip(res) {

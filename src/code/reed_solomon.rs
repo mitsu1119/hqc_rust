@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::{code::Code, util::galois_field_2m::GaloisField2m};
+use crate::{code::Code, util::galois_field_2m::GaloisField2mElement};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReedSolomon<const SYMBOL_FIELD_PPOLY: u16> {
@@ -278,7 +278,7 @@ impl<const SYMBOL_FIELD_PPOLY: u16> ReedSolomon<SYMBOL_FIELD_PPOLY> {
 }
 
 impl<const SYMBOL_FIELD_PPOLY: u16> Code for ReedSolomon<SYMBOL_FIELD_PPOLY> {
-    type SymbolType = GaloisField2m<SYMBOL_FIELD_PPOLY>;
+    type SymbolType = GaloisField2mElement<SYMBOL_FIELD_PPOLY>;
     type CodeType = Vec<Self::SymbolType>;
     type MessageType = Vec<Self::SymbolType>;
 
@@ -357,7 +357,7 @@ impl<const SYMBOL_FIELD_PPOLY: u16> Code for ReedSolomon<SYMBOL_FIELD_PPOLY> {
 mod tests {
     use crate::{
         code::{Code, reed_solomon::ReedSolomon},
-        util::galois_field_2m::GaloisField2m,
+        util::galois_field_2m::GaloisField2mElement,
     };
 
     #[test]
@@ -365,7 +365,7 @@ mod tests {
         const PPOLY: u16 = 0b100011101;
         const N: usize = 46;
         const K: usize = 16;
-        type F = GaloisField2m<PPOLY>;
+        type F = GaloisField2mElement<PPOLY>;
 
         let coeffs = [
             89, 69, 153, 116, 176, 117, 111, 75, 73, 233, 242, 233, 65, 210, 21, 139, 103, 173, 67,
@@ -398,7 +398,7 @@ mod tests {
         const PPOLY: u16 = 0b100011101;
         const N: usize = 46;
         const K: usize = 16;
-        type F = GaloisField2m<PPOLY>;
+        type F = GaloisField2mElement<PPOLY>;
 
         let coeffs = [
             89, 69, 153, 116, 176, 117, 111, 75, 73, 233, 242, 233, 65, 210, 21, 139, 103, 173, 67,
@@ -1473,7 +1473,7 @@ mod tests {
 
         for (x, r) in rs.genpoly_mul_table.into_iter().zip(res) {
             for (xx, rr) in x.into_iter().zip(r.into_iter()) {
-                assert_eq!(xx, GaloisField2m::<PPOLY>::new(rr).unwrap());
+                assert_eq!(xx, GaloisField2mElement::<PPOLY>::new(rr).unwrap());
             }
         }
     }
