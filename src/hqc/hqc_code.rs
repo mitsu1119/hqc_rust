@@ -33,7 +33,7 @@ impl<'a> HQCCode<'a> {
 impl<'a> Code for HQCCode<'a> {
     type SymbolType = u8;
     type MessageType = Vec<Self::SymbolType>;
-    type CodeType = Vec<u128>;
+    type CodeType = Vec<Self::SymbolType>;
 
     fn message_len(&self) -> usize {
         self.rs.message_len()
@@ -59,14 +59,31 @@ impl<'a> Code for HQCCode<'a> {
             res
         };
 
-        let res: Vec<_> = had_code.into_iter().flatten().collect();
+        let res_u128: Vec<_> = had_code.into_iter().flatten().collect();
+        let mut res = vec![];
+        for c in res_u128 {
+            let mut mask = 0xff << 120;
+            for i in 0..16 {
+                res.push(((c & mask) >> (120 - i * 8)) as u8);
+                mask >>= 8;
+            }
+        }
 
         res
     }
 
     fn decode(&self, code: Self::CodeType) -> Self::MessageType {
-        // self.had.decode(code);
-
+        assert!(code.len() % self.had.multiplicity as usize == 0);
+        /*
+        let mut res = vec![];
+        for i in (0..code.len()).step_by(self.had.multiplicity as usize) {
+            res.push(
+                self.had
+                    .decode(code[i..self.had.multiplicity as usize].to_vec()),
+            );
+        }
+        println!("{:?}", res);
+        panic!();*/
         vec![]
     }
 }
@@ -102,7 +119,7 @@ mod tests {
         let hex_str = {
             let mut s = String::new();
             for i in 0..enc.len() {
-                s += &format!("{:032x}", enc[i]);
+                s += &format!("{:02x}", enc[i]);
             }
             s
         };
@@ -137,7 +154,7 @@ mod tests {
         let hex_str = {
             let mut s = String::new();
             for i in 0..enc.len() {
-                s += &format!("{:032x}", enc[i]);
+                s += &format!("{:02x}", enc[i]);
             }
             s
         };
@@ -174,7 +191,7 @@ mod tests {
         let hex_str = {
             let mut s = String::new();
             for i in 0..enc.len() {
-                s += &format!("{:032x}", enc[i]);
+                s += &format!("{:02x}", enc[i]);
             }
             s
         };

@@ -3,7 +3,7 @@ use crate::code::{Code, hadamard::Hadamard7};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DuplicatedHadamard7 {
     had: Hadamard7,
-    multiplicity: u8,
+    pub multiplicity: u8,
 }
 
 impl DuplicatedHadamard7 {
