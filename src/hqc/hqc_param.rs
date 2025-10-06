@@ -60,29 +60,33 @@ impl<'a> HQCRSParam<'a> {
 }
 
 pub struct HQCParam<'a> {
-    pub rs_n: usize,
-    pub rs_k: usize,
-    pub omega_r: u8,
-    pub rs_symbol_field: GaloisField2m<'a>,
-    pub rs_genpoly: Vec<u8>,
+    pub rs_param: HQCRSParam<'a>,
     pub hadamard_multiplicity: u8,
+    pub omega_re: u8,
 }
 
 impl<'a> HQCParam<'a> {
-    pub fn new(
-        rs_n: usize,
-        rs_k: usize,
-        omega_r: u8,
-        rs_genpoly: Vec<u8>,
-        hadamard_multiplicity: u8,
-    ) -> Self {
+    pub fn hqc1() -> Self {
         Self {
-            rs_n,
-            rs_k,
-            omega_r,
-            rs_symbol_field: GaloisField2m::new(0b100011101).unwrap(),
-            rs_genpoly,
-            hadamard_multiplicity,
+            rs_param: HQCRSParam::new_rss1(),
+            hadamard_multiplicity: 3,
+            omega_re: 75,
+        }
+    }
+
+    pub fn hqc3() -> Self {
+        Self {
+            rs_param: HQCRSParam::new_rss3(),
+            hadamard_multiplicity: 5,
+            omega_re: 114,
+        }
+    }
+
+    pub fn hqc5() -> Self {
+        Self {
+            rs_param: HQCRSParam::new_rss1(),
+            hadamard_multiplicity: 5,
+            omega_re: 149,
         }
     }
 }
