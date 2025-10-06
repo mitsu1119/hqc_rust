@@ -1,8 +1,33 @@
-use crate::hqc::{hqc_hash::HQCHash, xof::XOF};
+use crate::hqc::{hqc_hash::HQCHash, hqc_param::HQCParam, xof::XOF};
 
-pub struct HQC_PKE;
+#[allow(non_camel_case_types)]
+pub struct HQC_PKE<'a> {
+    param: HQCParam<'a>,
+}
 
-impl HQC_PKE {
+impl<'a> HQC_PKE<'a> {
+    pub fn new(param: HQCParam<'a>) -> Self {
+        Self { param }
+    }
+
+    pub fn hqc1() -> Self {
+        Self {
+            param: HQCParam::hqc1(),
+        }
+    }
+
+    pub fn hqc3() -> Self {
+        Self {
+            param: HQCParam::hqc3(),
+        }
+    }
+
+    pub fn hqc5() -> Self {
+        Self {
+            param: HQCParam::hqc5(),
+        }
+    }
+
     fn generate_seeds(seed: &[u8]) -> ([u8; 32], [u8; 32]) {
         let pke_seeds = HQCHash::I(seed);
 
