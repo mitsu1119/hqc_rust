@@ -172,7 +172,7 @@ impl<'a> HQC_PKE<'a> {
         tr
     }
 
-    pub fn encrypt(&self, ek: ([u8; 32], Vec<u8>), m: Vec<u8>, theta: &[u8]) {
+    pub fn encrypt(&self, ek: ([u8; 32], Vec<u8>), m: Vec<u8>, theta: &[u8]) -> (Vec<u8>, Vec<u8>) {
         // regenerate encryption keys
         let seed = ek.0;
         let s = ek.1;
@@ -192,6 +192,14 @@ impl<'a> HQC_PKE<'a> {
 
         let encoder = self.param.gen_hqc_code();
         let code = encoder.encode(m);
+        let trunc = self.calc_trunc(s, r2, e);
+        assert_eq!(code.len(), trunc.len());
+        let mut v = code;
+        for i in 0..v.len() {
+            v[i] ^= trunc[i];
+        }
+
+        (u, v)
     }
 }
 
@@ -200,9 +208,27 @@ mod tests {
     use crate::hqc::hqc::HQC_PKE;
 
     #[test]
+    fn enc_dec() {
+        let seed = [
+            239, 43, 128, 244, 111, 58, 100, 55, 180, 216, 105, 187, 56, 189, 214, 0, 75, 255, 114,
+            188, 208, 206, 177, 57, 180, 184, 212, 115, 1, 244, 252, 177,
+        ];
+        let m = [
+            116, 178, 211, 82, 207, 116, 201, 52, 6, 156, 157, 231, 71, 87, 245, 5,
+        ];
+        let theta = [
+            242, 17, 161, 80, 21, 118, 23, 6, 227, 127, 237, 124, 232, 77, 112, 75, 161, 237, 10,
+            236, 158, 168, 239, 113, 69, 56, 158, 77, 236, 38, 48, 232,
+        ];
+
+        let hqc1 = HQC_PKE::hqc1();
+        let (ek, dk) = hqc1.keygen(&seed);
+        hqc1.encrypt(ek, m.to_vec(), &theta);
+    }
+
+    #[test]
     fn calc_trunc() {
         let hqc1 = HQC_PKE::hqc1();
-
         let s = vec![
             117, 50, 120, 154, 18, 82, 99, 89, 62, 119, 96, 225, 147, 51, 224, 124, 245, 167, 110,
             217, 238, 199, 45, 76, 237, 9, 230, 113, 75, 205, 140, 29, 30, 143, 35, 66, 190, 30,
