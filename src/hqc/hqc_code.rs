@@ -110,10 +110,7 @@ impl<'a> Code for HQCCode<'a> {
 mod tests {
     use crate::{
         code::Code,
-        hqc::{
-            hqc_code::HQCCode,
-            hqc_param::{HQCParam, HQCRSParam},
-        },
+        hqc::{hqc_code::HQCCode, hqc_param::HQCRSParam},
     };
 
     #[test]

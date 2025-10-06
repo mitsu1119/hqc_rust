@@ -35,13 +35,13 @@ impl<'a> HQC_PKE<'a> {
                 let k = (i + j) % self.param.n;
                 let ui = {
                     let ind = i >> 3;
-                    let bit_pos = i - (ind << 3);
+                    let bit_pos = i % 8;
                     let mask = 1 << bit_pos;
                     (u[ind] & mask) >> bit_pos
                 };
                 let vj = {
                     let ind = j >> 3;
-                    let bit_pos = j - (ind << 3);
+                    let bit_pos = j % 8;
                     let mask = 1 << bit_pos;
                     (v[ind] & mask) >> bit_pos
                 };
@@ -50,7 +50,7 @@ impl<'a> HQC_PKE<'a> {
                     continue;
                 }
                 let k_ind = k >> 3;
-                let k_bit_pos = k - (k_ind << 3);
+                let k_bit_pos = k % 8;
                 let mask = 1 << k_bit_pos;
                 res[k_ind] ^= mask;
             }
@@ -92,7 +92,7 @@ impl<'a> HQC_PKE<'a> {
         let mut res = vec![0u8; self.param.n.div_ceil(8)];
         for index in indices.iter() {
             let res_ind = index >> 3;
-            let bit_pos = index - (res_ind << 3);
+            let bit_pos = index % 8;
             let bit = 1 << bit_pos;
             res[res_ind] |= bit;
         }
@@ -107,7 +107,7 @@ impl<'a> HQC_PKE<'a> {
         (x, y)
     }
 
-    fn generate_ek(&self, seed: &[u8]) {
+    fn generate_ek(&self, seed: &[u8], x: Vec<u8>, y: Vec<u8>) -> Vec<u8> {
         let mut ctx = XOF::new(seed);
 
         let h = {
@@ -120,20 +120,30 @@ impl<'a> HQC_PKE<'a> {
             let n_bit_pos = self.param.n - (n_ind << 3);
             let bit = 1usize << (n_bit_pos + 1);
             let mask = bit - 1;
-            println!("{}", mask);
 
             let len = res.len();
             res[len - 1] &= mask as u8;
 
             res
         };
-        println!("{:?}", h);
+
+        let mut s = self.vec_mul(h, y);
+        for i in 0..s.len() {
+            s[i] ^= x[i];
+        }
+
+        s
     }
 
-    pub fn keygen(&self, seed: &[u8]) {
+    pub fn keygen(&self, seed: &[u8]) -> (([u8; 32], Vec<u8>), [u8; 32]) {
         let (seed_pkedk, seed_pkeek) = Self::generate_seeds(seed);
         let (x, y) = self.generate_dk(&seed_pkedk);
-        self.generate_ek(&seed_pkeek);
+        let s = self.generate_ek(&seed_pkeek, x, y);
+
+        let ek = (seed_pkeek, s);
+        let dk = seed_pkedk;
+
+        (ek, dk)
     }
 }
 
@@ -578,18 +588,5 @@ mod tests {
         );
 
         assert_eq!((seed_dk, seed_ek), res);
-    }
-
-    #[test]
-    fn keygen_hqc1() {
-        // seed_pke: 81313de32ad36c4779865fe66dda28aa9228818c0f3e2fa0348ef16e377d1049
-        let seed = [
-            129, 49, 61, 227, 42, 211, 108, 71, 121, 134, 95, 230, 109, 218, 40, 170, 146, 40, 129,
-            140, 15, 62, 47, 160, 52, 142, 241, 110, 55, 125, 16, 73,
-        ];
-        let hqc1 = HQC_PKE::hqc1();
-        hqc1.keygen(&seed);
-
-        panic!();
     }
 }
