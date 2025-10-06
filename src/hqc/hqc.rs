@@ -14,21 +14,29 @@ impl<'a> HQC_PKE<'a> {
     }
 
     pub fn hqc1() -> Self {
-        Self {
-            param: HQCParam::hqc1(),
-        }
+        Self::new(HQCParam::hqc1())
     }
 
     pub fn hqc3() -> Self {
-        Self {
-            param: HQCParam::hqc3(),
-        }
+        Self::new(HQCParam::hqc3())
     }
 
     pub fn hqc5() -> Self {
-        Self {
-            param: HQCParam::hqc5(),
-        }
+        Self::new(HQCParam::hqc5())
+    }
+
+    fn get_bit_from_bitvec(bits: &Vec<u8>, bit_position: usize) -> u8 {
+        let index = bit_position >> 3;
+        let position_in_u8 = bit_position % 8;
+        let mask = 1 << position_in_u8;
+        (bits[index] & mask) >> position_in_u8
+    }
+
+    fn bit_flip_in_bitvec(bits: &mut Vec<u8>, bit_position: usize) {
+        let index = bit_position >> 3;
+        let position_in_u8 = bit_position % 8;
+        let mask = 1 << position_in_u8;
+        bits[index] ^= mask;
     }
 
     fn vec_mul(&self, u: Vec<u8>, v: Vec<u8>) -> Vec<u8> {
@@ -36,33 +44,20 @@ impl<'a> HQC_PKE<'a> {
         for i in 0..self.param.n {
             for j in 0..self.param.n {
                 let k = (i + j) % self.param.n;
-                let ui = {
-                    let ind = i >> 3;
-                    let bit_pos = i % 8;
-                    let mask = 1 << bit_pos;
-                    (u[ind] & mask) >> bit_pos
-                };
-                let vj = {
-                    let ind = j >> 3;
-                    let bit_pos = j % 8;
-                    let mask = 1 << bit_pos;
-                    (v[ind] & mask) >> bit_pos
-                };
+                let ui = Self::get_bit_from_bitvec(&u, i);
+                let vj = Self::get_bit_from_bitvec(&v, j);
                 let uv = ui & vj;
                 if uv == 0 {
                     continue;
                 }
-                let k_ind = k >> 3;
-                let k_bit_pos = k % 8;
-                let mask = 1 << k_bit_pos;
-                res[k_ind] ^= mask;
+                Self::bit_flip_in_bitvec(&mut res, k);
             }
         }
         res
     }
 
     fn truncate(&self, v: &mut Vec<u8>) {
-        let mut new_size = (self.param.n1n2 + 7) >> 3;
+        let new_size = (self.param.n1n2 + 7) >> 3;
         let bit_pos = self.param.n1n2 % 8;
 
         if bit_pos != 0 {
