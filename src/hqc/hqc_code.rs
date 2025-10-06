@@ -11,7 +11,7 @@ pub struct HQCCode<'a> {
 }
 
 impl<'a> HQCCode<'a> {
-    fn new(param: &'a HQCRSParam<'a>, hadamard_multiplicity: u8) -> Self {
+    pub fn new(param: &'a HQCRSParam<'a>, hadamard_multiplicity: u8) -> Self {
         let had = DuplicatedHadamard7::new(hadamard_multiplicity);
         let rs = ReedSolomon::new(
             param.n,
@@ -84,7 +84,6 @@ impl<'a> Code for HQCCode<'a> {
             code_u128s.push(c);
         }
 
-        println!("{:x?}", code_u128s);
         assert!(code_u128s.len() % self.had.multiplicity as usize == 0);
 
         let mut had_msg = vec![];
