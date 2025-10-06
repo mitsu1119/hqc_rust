@@ -39,12 +39,48 @@ impl<'a> HQC_PKE<'a> {
         (seed_pkedk, seed_pkeek)
     }
 
-    fn generate_dk(seed: &[u8]) {
-        let ctx = XOF::new(seed);
+    fn sample_fixed_weight_vect_indices(&self, ctx: &mut XOF, weight: u8) -> Vec<usize> {
+        let mut res = vec![];
+        while res.len() != weight as usize {
+            let bytes = ctx.get_bytes(4);
+            let index_orig = ((bytes[3] as usize) << 24)
+                | ((bytes[2] as usize) << 16)
+                | ((bytes[1] as usize) << 8)
+                | bytes[0] as usize;
+            let index = index_orig % self.param.n;
+
+            if !res.contains(&index) {
+                res.push(index);
+            }
+        }
+        res
     }
 
-    pub fn keygen(seed: &[u8]) {
+    fn sample_fixed_weight_vect(&self, ctx: &mut XOF, weight: u8) -> Vec<u8> {
+        let indices = self.sample_fixed_weight_vect_indices(ctx, weight);
+
+        let mut res = vec![0u8; self.param.n.div_ceil(8)];
+        for index in indices.iter() {
+            let res_ind = index >> 3;
+            let bit_pos = index - (res_ind << 3);
+            let bit = 1 << bit_pos;
+            res[res_ind] |= bit;
+        }
+        res
+    }
+
+    fn generate_dk(&self, seed: &[u8]) -> (Vec<u8>, Vec<u8>) {
+        let mut ctx = XOF::new(seed);
+        let y = self.sample_fixed_weight_vect(&mut ctx, self.param.omega_re);
+        let x = self.sample_fixed_weight_vect(&mut ctx, self.param.omega_re);
+
+        (x, y)
+    }
+
+    pub fn keygen(&self, seed: &[u8]) {
         let (seed_pkedk, seed_pkeek) = Self::generate_seeds(seed);
+
+        let (x, y) = self.generate_dk(&seed_pkedk);
     }
 }
 
@@ -84,7 +120,8 @@ mod tests {
             129, 49, 61, 227, 42, 211, 108, 71, 121, 134, 95, 230, 109, 218, 40, 170, 146, 40, 129,
             140, 15, 62, 47, 160, 52, 142, 241, 110, 55, 125, 16, 73,
         ];
-        HQC_PKE::keygen(&seed);
+        let hqc1 = HQC_PKE::hqc1();
+        hqc1.keygen(&seed);
 
         panic!();
     }
