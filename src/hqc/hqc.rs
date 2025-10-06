@@ -1,6 +1,6 @@
 use crate::{
     code::Code,
-    hqc::{hqc_code::HQCCode, hqc_hash::HQCHash, hqc_param::HQCParam, xof::XOF},
+    hqc::{hqc_hash::HQCHash, hqc_param::HQCParam, xof::XOF},
 };
 
 #[allow(non_camel_case_types)]
@@ -201,6 +201,25 @@ impl<'a> HQC_PKE<'a> {
 
         (u, v)
     }
+
+    pub fn decrypt(&self, dk: [u8; 32], c: (Vec<u8>, Vec<u8>)) -> Vec<u8> {
+        let mut ctx = XOF::new(&dk);
+        let y = self.sample_fixed_weight_vect(&mut ctx, self.param.omega_re);
+        let (u, v) = c;
+
+        let code = {
+            let mut tmp = self.vec_mul(u, y);
+            self.truncate(&mut tmp);
+            assert_eq!(v.len(), tmp.len());
+            for i in 0..tmp.len() {
+                tmp[i] ^= v[i];
+            }
+            tmp
+        };
+        let decoder = self.param.gen_hqc_code();
+        let m = decoder.decode(code);
+        m
+    }
 }
 
 #[cfg(test)]
@@ -213,7 +232,7 @@ mod tests {
             239, 43, 128, 244, 111, 58, 100, 55, 180, 216, 105, 187, 56, 189, 214, 0, 75, 255, 114,
             188, 208, 206, 177, 57, 180, 184, 212, 115, 1, 244, 252, 177,
         ];
-        let m = [
+        let m = vec![
             116, 178, 211, 82, 207, 116, 201, 52, 6, 156, 157, 231, 71, 87, 245, 5,
         ];
         let theta = [
@@ -223,7 +242,10 @@ mod tests {
 
         let hqc1 = HQC_PKE::hqc1();
         let (ek, dk) = hqc1.keygen(&seed);
-        hqc1.encrypt(ek, m.to_vec(), &theta);
+        let c = hqc1.encrypt(ek, m.clone(), &theta);
+
+        let m_ = hqc1.decrypt(dk, c);
+        assert_eq!(m, m_);
     }
 
     #[test]
