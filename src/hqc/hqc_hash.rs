@@ -1,6 +1,5 @@
 use sha3::{Digest, Sha3_512};
 
-#[allow(non_camel_case_types)]
 pub struct HQCHash {}
 
 impl HQCHash {

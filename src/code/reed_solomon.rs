@@ -318,6 +318,7 @@ impl<'a> Code for ReedSolomon<'a> {
     }
 
     fn encode(&self, message: Self::MessageType) -> Self::CodeType {
+        // x^{n-k} u(x)
         let mut shifted_message = {
             let mut res = vec![self.symbol_field.zero(); self.n];
             res[..self.k].copy_from_slice(&message);
@@ -325,6 +326,7 @@ impl<'a> Code for ReedSolomon<'a> {
             res
         };
 
+        // x^{n-k} u(x) mod g(x)
         let shifted_message_mod = {
             let mut res = shifted_message.clone();
             let mut res_deg = self.poly_deg(&res);
@@ -345,6 +347,7 @@ impl<'a> Code for ReedSolomon<'a> {
             res
         };
 
+        // x^{n-k} u(x) + (x^{n-k} u(x) mod g(x))
         for i in 0..self.n {
             shifted_message[i] += shifted_message_mod[i];
         }

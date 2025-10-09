@@ -138,7 +138,6 @@ impl<'a> HQC_PKE<'a> {
         let mut ctx = XOF::new(seed);
 
         let h = self.sample_vec(&mut ctx);
-
         let mut s = self.vec_mul(h, y);
         for i in 0..s.len() {
             s[i] ^= x[i];
