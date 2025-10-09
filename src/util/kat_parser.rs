@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, BufRead, BufReader, Error},
+    io::{self, BufRead, BufReader},
 };
 
 #[derive(Debug)]
@@ -15,7 +15,7 @@ impl<'a> KATParser {
         Ok(Self { br })
     }
 
-    fn line_after(&mut self, s: &'a str) -> io::Result<Option<String>> {
+    pub fn line_after(&mut self, s: &'a str) -> io::Result<Option<String>> {
         let mut res = String::new();
 
         loop {
