@@ -32,8 +32,10 @@ impl XOF {
         self.squeeze_into(&mut out);
 
         // 公式のxof実装に合わせて追加で消費する
-        let mut _trash = vec![0u8; (8 - len % 8) as usize];
-        self.squeeze_into(&mut _trash);
+        if len % 8 != 0 {
+            let mut _trash = vec![0u8; (8 - len % 8) as usize];
+            self.squeeze_into(&mut _trash);
+        }
 
         out
     }

@@ -119,17 +119,19 @@ impl<'a> HQC_PKE<'a> {
         let mut rand = ctx.get_bytes(4 * weight as usize);
         let mut res = vec![0; weight as usize];
 
-        for i in (0..weight).rev() {
+        for i in 0..weight {
             let rand_index = (i as usize) << 2;
             let index_chunk = ((rand[rand_index + 3] as usize) << 24)
                 | ((rand[rand_index + 2] as usize) << 16)
                 | ((rand[rand_index + 1] as usize) << 8)
                 | (rand[rand_index] as usize);
-            let index = i as usize + ((index_chunk * (self.param.n - i as usize)) >> 32);
-            res[i as usize] = index;
+            res[i as usize] = i as usize + ((index_chunk * (self.param.n - i as usize)) >> 32);
+        }
 
-            let uppers: &[usize] = &res[(i as usize) + 1..];
-            if i != 0 && uppers.contains(&index) {
+        for i in (0..(weight - 1)).rev() {
+            let x = res[i as usize];
+            let found = res[(i as usize) + 1..].iter().any(|&y| y == x);
+            if found {
                 res[i as usize] = i as usize;
             }
         }
@@ -229,6 +231,9 @@ impl<'a> HQC_PKE<'a> {
         let r2 = self.sample_fixed_weight_vect(&mut ctx, self.param.omega_re);
         let e = self.sample_fixed_weight_vect(&mut ctx, self.param.omega_re);
         let r1 = self.sample_fixed_weight_vect(&mut ctx, self.param.omega_re);
+        println!("{:x?}\n", r2);
+        println!("{:x?}\n", e);
+        println!("{:x?}\n", r1);
 
         let mut u = self.vec_mul(h, r2.clone());
         for i in 0..u.len() {
@@ -272,7 +277,7 @@ mod tests {
     use crate::{hqc::hqc::HQC_PKE, util::kat_parser::KATParser};
 
     #[test]
-    fn generate_seeds() {
+    fn generate_seeds_hqc1() {
         let mut parser = KATParser::new("kats/hqc-1/intermediates_values").expect("");
 
         let kat_seed_dk = parser.bytes_after("seed_dk: ").expect("").unwrap();
@@ -287,7 +292,37 @@ mod tests {
     }
 
     #[test]
-    fn encrypt() {
+    fn generate_seeds_hqc3() {
+        let mut parser = KATParser::new("kats/hqc-3/intermediates_values").expect("");
+
+        let kat_seed_dk = parser.bytes_after("seed_dk: ").expect("").unwrap();
+        let kat_seed_ek = parser.bytes_after("seed_ek: ").expect("").unwrap();
+        let kat_seed_pke = parser.bytes_after("seed_pke: ").expect("").unwrap();
+
+        let (seed_dk, seed_ek) = HQC_PKE::generate_seeds(&kat_seed_pke);
+        assert_eq!(
+            (seed_dk.to_vec(), seed_ek.to_vec()),
+            (kat_seed_dk, kat_seed_ek)
+        );
+    }
+
+    #[test]
+    fn generate_seeds_hqc5() {
+        let mut parser = KATParser::new("kats/hqc-5/intermediates_values").expect("");
+
+        let kat_seed_dk = parser.bytes_after("seed_dk: ").expect("").unwrap();
+        let kat_seed_ek = parser.bytes_after("seed_ek: ").expect("").unwrap();
+        let kat_seed_pke = parser.bytes_after("seed_pke: ").expect("").unwrap();
+
+        let (seed_dk, seed_ek) = HQC_PKE::generate_seeds(&kat_seed_pke);
+        assert_eq!(
+            (seed_dk.to_vec(), seed_ek.to_vec()),
+            (kat_seed_dk, kat_seed_ek)
+        );
+    }
+
+    #[test]
+    fn encrypt_hqc1() {
         let mut parser = KATParser::new("kats/hqc-1/intermediates_values").expect("");
 
         let kat_seed_pke = parser.bytes_after("seed_pke: ").expect("").unwrap();
@@ -308,7 +343,46 @@ mod tests {
     }
 
     #[test]
-    fn decrypt() {
+    fn encrypt_hqc3() {
+        let mut parser = KATParser::new("kats/hqc-3/intermediates_values").expect("");
+
+        let kat_seed_pke = parser.bytes_after("seed_pke: ").expect("").unwrap();
+        let kat_c_u = parser.bytes_after("c_pke->u: ").expect("").unwrap();
+        let kat_c_v = parser.bytes_after("c_pke->v: ").expect("").unwrap();
+        let _ = parser.bytes_after("ek_kem: ").expect("").unwrap();
+        let kat_m = parser.bytes_after("m: ").expect("").unwrap();
+        let kat_theta = parser.bytes_after("theta: ").expect("").unwrap();
+
+        let hqc = HQC_PKE::hqc3();
+        let (ek, dk) = hqc.keygen(&kat_seed_pke);
+
+        let c = hqc.encrypt(ek, kat_m, &kat_theta);
+        let (u, v) = c;
+    }
+
+    #[test]
+    fn encrypt_hqc5() {
+        let mut parser = KATParser::new("kats/hqc-5/intermediates_values").expect("");
+
+        let kat_seed_pke = parser.bytes_after("seed_pke: ").expect("").unwrap();
+        let kat_c_u = parser.bytes_after("c_pke->u: ").expect("").unwrap();
+        let kat_c_v = parser.bytes_after("c_pke->v: ").expect("").unwrap();
+        let _ = parser.bytes_after("ek_kem: ").expect("").unwrap();
+        let kat_m = parser.bytes_after("m: ").expect("").unwrap();
+        let kat_theta = parser.bytes_after("theta: ").expect("").unwrap();
+
+        let hqc = HQC_PKE::hqc5();
+        let (ek, dk) = hqc.keygen(&kat_seed_pke);
+
+        let c = hqc.encrypt(ek, kat_m, &kat_theta);
+        let (u, v) = c;
+
+        assert_eq!(u, kat_c_u);
+        assert_eq!(v, kat_c_v);
+    }
+
+    #[test]
+    fn decrypt_hqc1() {
         let mut parser = KATParser::new("kats/hqc-1/intermediates_values").expect("");
 
         let kat_c_u = parser.bytes_after("c_pke.u: ").expect("").unwrap();
@@ -323,13 +397,69 @@ mod tests {
     }
 
     #[test]
-    fn keygen() {
+    fn decrypt_hqc3() {
+        let mut parser = KATParser::new("kats/hqc-3/intermediates_values").expect("");
+
+        let kat_c_u = parser.bytes_after("c_pke.u: ").expect("").unwrap();
+        let kat_c_v = parser.bytes_after("c_pke.v: ").expect("").unwrap();
+        let kat_dk_pke = parser.bytes_after("dk_pke: ").expect("").unwrap();
+        let kat_m_prime = parser.bytes_after("m_prime: ").expect("").unwrap();
+
+        let hqc = HQC_PKE::hqc3();
+        let m_prime = hqc.decrypt(kat_dk_pke.try_into().unwrap(), (kat_c_u, kat_c_v));
+
+        assert_eq!(m_prime, kat_m_prime);
+    }
+
+    #[test]
+    fn decrypt_hqc5() {
+        let mut parser = KATParser::new("kats/hqc-5/intermediates_values").expect("");
+
+        let kat_c_u = parser.bytes_after("c_pke.u: ").expect("").unwrap();
+        let kat_c_v = parser.bytes_after("c_pke.v: ").expect("").unwrap();
+        let kat_dk_pke = parser.bytes_after("dk_pke: ").expect("").unwrap();
+        let kat_m_prime = parser.bytes_after("m_prime: ").expect("").unwrap();
+
+        let hqc = HQC_PKE::hqc5();
+        let m_prime = hqc.decrypt(kat_dk_pke.try_into().unwrap(), (kat_c_u, kat_c_v));
+
+        assert_eq!(m_prime, kat_m_prime);
+    }
+
+    #[test]
+    fn keygen_hqc1() {
         let mut parser = KATParser::new("kats/hqc-1/intermediates_values").expect("");
 
         let kat_s = parser.bytes_after("s: ").expect("").unwrap();
         let kat_seed_pke = parser.bytes_after("seed_pke: ").expect("").unwrap();
 
         let hqc = HQC_PKE::hqc1();
+        let ((_, s), _) = hqc.keygen(&kat_seed_pke);
+
+        assert_eq!(s, kat_s);
+    }
+
+    #[test]
+    fn keygen_hqc3() {
+        let mut parser = KATParser::new("kats/hqc-3/intermediates_values").expect("");
+
+        let kat_s = parser.bytes_after("s: ").expect("").unwrap();
+        let kat_seed_pke = parser.bytes_after("seed_pke: ").expect("").unwrap();
+
+        let hqc = HQC_PKE::hqc3();
+        let ((_, s), _) = hqc.keygen(&kat_seed_pke);
+
+        assert_eq!(s, kat_s);
+    }
+
+    #[test]
+    fn keygen_hqc5() {
+        let mut parser = KATParser::new("kats/hqc-5/intermediates_values").expect("");
+
+        let kat_s = parser.bytes_after("s: ").expect("").unwrap();
+        let kat_seed_pke = parser.bytes_after("seed_pke: ").expect("").unwrap();
+
+        let hqc = HQC_PKE::hqc5();
         let ((_, s), _) = hqc.keygen(&kat_seed_pke);
 
         assert_eq!(s, kat_s);

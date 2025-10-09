@@ -78,7 +78,7 @@ impl<'a> HQCParam<'a> {
 
     pub fn hqc5() -> Self {
         Self {
-            rs_param: HQCRSParam::new_rss1(),
+            rs_param: HQCRSParam::new_rss5(),
             hadamard_multiplicity: 5,
             omega: 131,
             omega_re: 149,
