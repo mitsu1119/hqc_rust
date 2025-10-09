@@ -269,7 +269,7 @@ impl<'a> HQC_PKE<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::hqc::hqc::HQC_PKE;
+    use crate::{hqc::hqc::HQC_PKE, util::kat_parser::KATParser};
 
     #[test]
     fn enc_dec() {
