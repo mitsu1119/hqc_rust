@@ -295,6 +295,10 @@ mod tests {
 
     #[test]
     fn generate_seeds() {
+        let mut parser = KATParser::new("kats/hqc-1/intermediates_values").expect("");
+        println!("{:x?}", parser.bytes_after("seed_dk: "));
+        println!("{:x?}", parser.bytes_after("seed_ek: "));
+
         // seed_pke: 81313de32ad36c4779865fe66dda28aa9228818c0f3e2fa0348ef16e377d1049
         let seed = [
             129, 49, 61, 227, 42, 211, 108, 71, 121, 134, 95, 230, 109, 218, 40, 170, 146, 40, 129,
