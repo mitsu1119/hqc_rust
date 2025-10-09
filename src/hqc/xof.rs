@@ -8,9 +8,12 @@ pub struct XOF {
 }
 
 impl XOF {
+    const HQC_XOF_DOMAIN: u8 = 1;
+
     pub fn new(seed: &[u8]) -> Self {
         let mut ctx = Shake256::default();
         ctx.update(seed);
+        ctx.update(&[Self::HQC_XOF_DOMAIN]);
         Self {
             reader: ctx.finalize_xof(),
         }
@@ -32,6 +35,3 @@ impl XOF {
         out
     }
 }
-
-#[cfg(test)]
-mod tests {}
