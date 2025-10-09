@@ -231,9 +231,6 @@ impl<'a> HQC_PKE<'a> {
         let r2 = self.sample_fixed_weight_vect(&mut ctx, self.param.omega_re);
         let e = self.sample_fixed_weight_vect(&mut ctx, self.param.omega_re);
         let r1 = self.sample_fixed_weight_vect(&mut ctx, self.param.omega_re);
-        println!("{:x?}\n", r2);
-        println!("{:x?}\n", e);
-        println!("{:x?}\n", r1);
 
         let mut u = self.vec_mul(h, r2.clone());
         for i in 0..u.len() {
