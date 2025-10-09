@@ -79,7 +79,9 @@ impl<'a> HQC_PKE<'a> {
         (seed_pkedk, seed_pkeek)
     }
 
-    fn sample_fixed_weight_vect_indices(&self, ctx: &mut XOF, weight: u8) -> Vec<usize> {
+    // SampleFixedWeightVect$
+    // unbias but rejection sampling
+    fn sample_fixed_weight_vect_indices_dollar(&self, ctx: &mut XOF, weight: u8) -> Vec<usize> {
         let threshold = ((1 << 24) / self.param.n) * self.param.n;
         let block_size = 3 * weight as usize;
 
@@ -111,9 +113,31 @@ impl<'a> HQC_PKE<'a> {
         res
     }
 
-    fn sample_fixed_weight_vect(&self, ctx: &mut XOF, weight: u8) -> Vec<u8> {
-        let indices = self.sample_fixed_weight_vect_indices(ctx, weight);
+    // SampleFixedWeightVect
+    // non-rejection sampling but small bias
+    fn sample_fixed_weight_vect_indices(&self, ctx: &mut XOF, weight: u8) -> Vec<usize> {
+        let mut rand = ctx.get_bytes(4 * weight as usize);
+        let mut res = vec![0; weight as usize];
 
+        for i in (0..weight).rev() {
+            let rand_index = (i as usize) << 2;
+            let index_chunk = ((rand[rand_index] as usize) << 24)
+                | ((rand[rand_index + 1] as usize) << 16)
+                | ((rand[rand_index + 2] as usize) << 8)
+                | (rand[rand_index + 3] as usize);
+            let index = i as usize + ((index_chunk * (self.param.n - i as usize)) >> 32);
+            res[i as usize] = index;
+
+            let uppers: &[usize] = &res[(i as usize) + 1..];
+            if i != 0 && uppers.contains(&index) {
+                res[i as usize] = i as usize;
+            }
+        }
+
+        res
+    }
+
+    fn generate_vec_from_weight_indices(&self, indices: &[usize]) -> Vec<u8> {
         let mut res = vec![0u8; self.param.n.div_ceil(8)];
         for index in indices.iter() {
             let res_ind = index >> 3;
@@ -121,6 +145,19 @@ impl<'a> HQC_PKE<'a> {
             let bit = 1 << bit_pos;
             res[res_ind] |= bit;
         }
+
+        res
+    }
+
+    fn sample_fixed_weight_vect_dollar(&self, ctx: &mut XOF, weight: u8) -> Vec<u8> {
+        let indices = self.sample_fixed_weight_vect_indices_dollar(ctx, weight);
+        let res = self.generate_vec_from_weight_indices(&indices);
+        res
+    }
+
+    fn sample_fixed_weight_vect(&self, ctx: &mut XOF, weight: u8) -> Vec<u8> {
+        let indices = self.sample_fixed_weight_vect_indices(ctx, weight);
+        let res = self.generate_vec_from_weight_indices(&indices);
         res
     }
 
@@ -139,8 +176,8 @@ impl<'a> HQC_PKE<'a> {
 
     fn generate_dk(&self, seed: &[u8]) -> (Vec<u8>, Vec<u8>) {
         let mut ctx = XOF::new(seed);
-        let y = self.sample_fixed_weight_vect(&mut ctx, self.param.omega);
-        let x = self.sample_fixed_weight_vect(&mut ctx, self.param.omega);
+        let y = self.sample_fixed_weight_vect_dollar(&mut ctx, self.param.omega);
+        let x = self.sample_fixed_weight_vect_dollar(&mut ctx, self.param.omega);
 
         (x, y)
     }
@@ -212,7 +249,7 @@ impl<'a> HQC_PKE<'a> {
 
     pub fn decrypt(&self, dk: [u8; 32], c: (Vec<u8>, Vec<u8>)) -> Vec<u8> {
         let mut ctx = XOF::new(&dk);
-        let y = self.sample_fixed_weight_vect(&mut ctx, self.param.omega);
+        let y = self.sample_fixed_weight_vect_dollar(&mut ctx, self.param.omega);
         let (u, v) = c;
 
         let code = {
