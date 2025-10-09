@@ -83,8 +83,6 @@ impl<'a> HQC_PKE<'a> {
         let threshold = ((1 << 24) / self.param.n) * self.param.n;
         let block_size = 3 * weight as usize;
 
-        println!("block_size {}", block_size);
-
         let mut rand = vec![];
         let mut cnt = block_size;
         let mut res = vec![];
@@ -92,7 +90,6 @@ impl<'a> HQC_PKE<'a> {
             let index_chunk = loop {
                 if cnt == block_size {
                     rand = ctx.get_bytes(block_size);
-                    println!("{:?}", rand);
                     cnt = 0;
                 }
 
@@ -116,8 +113,6 @@ impl<'a> HQC_PKE<'a> {
 
     fn sample_fixed_weight_vect(&self, ctx: &mut XOF, weight: u8) -> Vec<u8> {
         let indices = self.sample_fixed_weight_vect_indices(ctx, weight);
-
-        println!("{:?}", indices);
 
         let mut res = vec![0u8; self.param.n.div_ceil(8)];
         for index in indices.iter() {
@@ -146,8 +141,6 @@ impl<'a> HQC_PKE<'a> {
         let mut ctx = XOF::new(seed);
         let y = self.sample_fixed_weight_vect(&mut ctx, self.param.omega);
         let x = self.sample_fixed_weight_vect(&mut ctx, self.param.omega);
-
-        println!("{:x?}", x);
 
         (x, y)
     }
