@@ -1,3 +1,5 @@
+use std::panic::{AssertUnwindSafe, catch_unwind};
+
 use crate::hqc::{
     hqc_hash::HQCHash,
     hqc_kem_data::{CiphertextKEM, DecryptionKeyKEM, EncryptionKeyKEM},
@@ -104,8 +106,8 @@ impl<'a> HQC_KEM<'a> {
             (shared_secret, theta)
         };
 
-        let seed_pke: [u8; 32] = ek_kem.seed_pke().clone().try_into().unwrap();
-        let s = ek_kem.s().clone().to_vec();
+        let seed_pke: [u8; 32] = ek_kem.seed_pke().try_into().unwrap();
+        let s = ek_kem.s().to_vec();
         let c_pke = self.pke.encrypt((seed_pke, s), m.to_vec(), &theta);
 
         let c_kem = {
@@ -116,7 +118,7 @@ impl<'a> HQC_KEM<'a> {
             c_kem.resize(len + c_pke.1.len() + salt.len(), 0);
             c_kem[len..len + c_pke.1.len()].copy_from_slice(&c_pke.1);
             c_kem[len + c_pke.1.len()..].copy_from_slice(salt);
-            CiphertextKEM::new(c_kem, c_len)
+            CiphertextKEM::new(c_kem, c_len, len)
         };
 
         (shared_secret, c_kem)
@@ -144,6 +146,79 @@ impl<'a> HQC_KEM<'a> {
             res
         };
         self.encaps_from_m_salt(ek_kem, &m, &salt)
+    }
+
+    pub fn decaps(&self, dk_kem: &DecryptionKeyKEM, c_kem: &CiphertextKEM) -> Vec<u8> {
+        let ek_kem = dk_kem.ek_kem();
+        let salt = c_kem.salt();
+        let sigma = dk_kem.sigma();
+
+        let m_prime = {
+            let dk_pke: [u8; 32] = dk_kem.dk_pke().try_into().unwrap();
+            let (u, v) = c_kem.c_pke_tupe();
+            match catch_unwind(AssertUnwindSafe(|| {
+                self.pke.decrypt(dk_pke, (u.to_vec(), v.to_vec()))
+            })) {
+                Ok(v) => v,
+                Err(_) => vec![],
+            }
+        };
+
+        let k_theta_prime = {
+            let mut h = HQCHash::H(&ek_kem).to_vec();
+            let len = h.len();
+            h.reserve(m_prime.len() + salt.len());
+            h.resize(len + m_prime.len() + salt.len(), 0);
+            h[len..len + m_prime.len()].copy_from_slice(&m_prime);
+            h[len + m_prime.len()..].copy_from_slice(&salt);
+            HQCHash::G(&h)
+        };
+
+        let (shared_secret_prime, theta_prime) = {
+            let mut shared_secret = vec![0; Self::SHARED_SECRET_BYTES];
+            let mut theta = vec![0; k_theta_prime.len() - Self::SHARED_SECRET_BYTES];
+
+            shared_secret.copy_from_slice(&k_theta_prime[..Self::SHARED_SECRET_BYTES]);
+            theta.copy_from_slice(&k_theta_prime[Self::SHARED_SECRET_BYTES..]);
+
+            (shared_secret, theta)
+        };
+
+        let ek_kem_struct = EncryptionKeyKEM::new(ek_kem.to_vec(), Self::SEED_BYTES);
+
+        let seed_pke: [u8; 32] = ek_kem_struct.seed_pke().try_into().unwrap();
+        let s = ek_kem_struct.s().to_vec();
+        let c_pke_prime = self
+            .pke
+            .encrypt((seed_pke, s), m_prime.clone(), &theta_prime);
+
+        let c_kem_prime = {
+            let mut c_kem = c_pke_prime.0;
+            let len = c_kem.len();
+            let c_len = len + c_pke_prime.1.len();
+            c_kem.reserve(c_pke_prime.1.len() + salt.len());
+            c_kem.resize(len + c_pke_prime.1.len() + salt.len(), 0);
+            c_kem[len..len + c_pke_prime.1.len()].copy_from_slice(&c_pke_prime.1);
+            c_kem[len + c_pke_prime.1.len()..].copy_from_slice(salt);
+            CiphertextKEM::new(c_kem, c_len, len)
+        };
+
+        // rejection key
+        let rejection_key = {
+            let mut h = HQCHash::H(&ek_kem).to_vec();
+            let len = h.len();
+            h.reserve(sigma.len() + c_kem.data.len());
+            h.resize(len + sigma.len() + c_kem.data.len(), 0);
+            h[len..len + sigma.len()].copy_from_slice(&sigma);
+            h[len + sigma.len()..].copy_from_slice(&c_kem.data);
+            HQCHash::J(&h)
+        };
+
+        if m_prime == vec![] || *c_kem != c_kem_prime {
+            rejection_key.to_vec()
+        } else {
+            shared_secret_prime
+        }
     }
 }
 
@@ -189,6 +264,9 @@ mod tests {
 
         assert_eq!(c_kem.data, kat_ct);
         assert_eq!(shared_secret, kat_ss);
+
+        let shared_secret_prime = hqc.decaps(&dk, &c_kem);
+        assert_eq!(shared_secret, shared_secret_prime);
     }
 
     #[test]
@@ -228,6 +306,9 @@ mod tests {
 
             assert_eq!(c_kem.data, kat_ct);
             assert_eq!(shared_secret, kat_ss);
+
+            let shared_secret_prime = hqc.decaps(&dk, &c_kem);
+            assert_eq!(shared_secret, shared_secret_prime);
 
             if count == "99" {
                 break;
@@ -270,6 +351,9 @@ mod tests {
 
         assert_eq!(c_kem.data, kat_ct);
         assert_eq!(shared_secret, kat_ss);
+
+        let shared_secret_prime = hqc.decaps(&dk, &c_kem);
+        assert_eq!(shared_secret, shared_secret_prime);
     }
 
     #[test]
@@ -309,6 +393,9 @@ mod tests {
 
             assert_eq!(c_kem.data, kat_ct);
             assert_eq!(shared_secret, kat_ss);
+
+            let shared_secret_prime = hqc.decaps(&dk, &c_kem);
+            assert_eq!(shared_secret, shared_secret_prime);
 
             if count == "99" {
                 break;
@@ -351,6 +438,9 @@ mod tests {
 
         assert_eq!(c_kem.data, kat_ct);
         assert_eq!(shared_secret, kat_ss);
+
+        let shared_secret_prime = hqc.decaps(&dk, &c_kem);
+        assert_eq!(shared_secret, shared_secret_prime);
     }
 
     #[test]
@@ -390,6 +480,9 @@ mod tests {
 
             assert_eq!(c_kem.data, kat_ct);
             assert_eq!(shared_secret, kat_ss);
+
+            let shared_secret_prime = hqc.decaps(&dk, &c_kem);
+            assert_eq!(shared_secret, shared_secret_prime);
 
             if count == "99" {
                 break;

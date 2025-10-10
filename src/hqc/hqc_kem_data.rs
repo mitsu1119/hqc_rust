@@ -47,18 +47,29 @@ impl DecryptionKeyKEM {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct CiphertextKEM {
     pub data: Vec<u8>,
     cipher_len: usize,
+    c_pke_u_len: usize,
 }
 
 impl CiphertextKEM {
-    pub fn new(data: Vec<u8>, cipher_len: usize) -> Self {
-        Self { data, cipher_len }
+    pub fn new(data: Vec<u8>, cipher_len: usize, c_pke_u_len: usize) -> Self {
+        Self {
+            data,
+            cipher_len,
+            c_pke_u_len,
+        }
     }
     pub fn c_pke(&self) -> &[u8] {
         &self.data[..self.cipher_len]
+    }
+    pub fn c_pke_tupe(&self) -> (&[u8], &[u8]) {
+        (
+            &self.c_pke()[..self.c_pke_u_len],
+            &self.c_pke()[self.c_pke_u_len..],
+        )
     }
     pub fn salt(&self) -> &[u8] {
         &self.data[self.cipher_len..]
