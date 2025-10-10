@@ -380,7 +380,7 @@ impl<'a> HQC_PKE<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{hqc::hqc::HQC_PKE, util::kat_parser::KATParser};
+    use crate::{hqc::hqc_pke::HQC_PKE, util::kat_parser::KATParser};
 
     #[test]
     fn generate_seeds_hqc1() {
