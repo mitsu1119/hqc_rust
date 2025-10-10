@@ -1,8 +1,15 @@
-# hqc_rust
-HQCのRust実装
+# hqc rust
 
-## Tests
-テストベクタとして、HQC公式リポジトリ（LICENSE:Public Domain）で記録されているKAT及び中間値を使用  
+## 概要
+HQC（https://pqc-hqc.org/doc/hqc_specifications_2025_08_22.pdf ）のRust実装です。
+
+アルゴリズムの全体像を学ぶため、実験的に作成しました。
+プログラムの定時間化など、サイドチャネル攻撃に対する緩和策はまだ十分ではないため、実際のアプリケーションには組み込まないでください。
+
+## Test Vectors
+HQC公式リポジトリにて配布されているKATs及び中間値（LICENSE: Public Domain）を使用しました。
+
+**ファイル一覧**
 リポジトリURL：https://gitlab.com/pqc-hqc/hqc  
 ファイル取得日：2025/09/24  
 ファイル取得時のコミット：d622142a50f3ce6b6e1f5b15a5119d96c67194e0  
