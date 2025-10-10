@@ -75,9 +75,9 @@ impl<'a> HQC_KEM<'a> {
         Self::new(HQCParam::hqc5())
     }
 
-    pub fn keygen_from_seed(&self, seed_kem: [u8; 32]) -> (EncryptionKeyKEM, DecryptionKeyKEM) {
+    pub fn keygen_from_seed(&self, seed_kem: &[u8]) -> (EncryptionKeyKEM, DecryptionKeyKEM) {
         // generate randomness
-        let mut ctx_kem = XOF::new(&seed_kem);
+        let mut ctx_kem = XOF::new(seed_kem);
         let seed_pke = ctx_kem.get_bytes(Self::SEED_BYTES);
         let sigma = ctx_kem.get_bytes(self.pke.param.k);
 
@@ -99,8 +99,8 @@ impl<'a> HQC_KEM<'a> {
         let dk_kem = {
             let mut dk_kem = ek_kem.clone();
             let len = dk_kem.len();
-            dk_kem.reserve(64 + self.pke.param.k);
-            dk_kem.resize(len + 64 + self.pke.param.k, 0);
+            dk_kem.reserve(32 + self.pke.param.k + seed_kem.len());
+            dk_kem.resize(len + 32 + self.pke.param.k + seed_kem.len(), 0);
             dk_kem[len..len + 32].copy_from_slice(&dk_pke);
             dk_kem[len + 32..len + 32 + self.pke.param.k].copy_from_slice(&sigma);
             dk_kem[len + 32 + self.pke.param.k..].copy_from_slice(&seed_kem);
@@ -120,7 +120,7 @@ impl<'a> HQC_KEM<'a> {
             res
         };
 
-        self.keygen_from_seed(seed_kem)
+        self.keygen_from_seed(&seed_kem)
     }
 }
 
@@ -142,6 +142,6 @@ mod tests {
         let seed = KATParser::hex_to_bytes(&seed_bytes);
 
         let hqc = HQC_KEM::hqc1();
-        // let (ek, dk) = hqc.keygen_from_seed(seed);
+        let (ek, dk) = hqc.keygen_from_seed(&seed);
     }
 }
