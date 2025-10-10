@@ -131,6 +131,20 @@ impl<'a> HQC_KEM<'a> {
 
         self.keygen_from_seed(&seed_kem)
     }
+
+    pub fn encaps(&self, ek_kem: &EncryptionKeyKEM) -> (Vec<u8>, CiphertextKEM) {
+        let m = {
+            let mut res = vec![0u8; self.k()];
+            getrandom::fill(&mut res).expect("OS RNG");
+            res
+        };
+        let salt = {
+            let mut res = vec![0u8; self.salt_bytes()];
+            getrandom::fill(&mut res).expect("OS RNG");
+            res
+        };
+        self.encaps_from_m_salt(ek_kem, &m, &salt)
+    }
 }
 
 #[cfg(test)]
@@ -141,7 +155,7 @@ mod tests {
     };
 
     #[test]
-    fn hqc1_kats() {
+    fn hqc1_kat1() {
         println!("HQC-1 KATs test");
 
         let mut parser = KATParser::new("kats/hqc-1/PQCkemKAT_2321.rsp").expect("");
@@ -175,5 +189,211 @@ mod tests {
 
         assert_eq!(c_kem.data, kat_ct);
         assert_eq!(shared_secret, kat_ss);
+    }
+
+    #[test]
+    #[ignore]
+    fn hqc1_kats() {
+        println!("HQC-1 KATs test");
+
+        let mut parser = KATParser::new("kats/hqc-1/PQCkemKAT_2321.rsp").expect("");
+
+        loop {
+            let count = parser.line_after("count = ").unwrap().expect("");
+            println!("count: {}", count);
+
+            let seed_bytes = parser.line_after("seed = ").unwrap().expect("");
+            println!("seed: {}", seed_bytes);
+            let seed = KATParser::hex_to_bytes(&seed_bytes);
+
+            let mut test_xof = XOF::new_prng(&seed);
+            let seed_kem = test_xof.get_bytes(HQC_KEM::SEED_BYTES);
+
+            let hqc = HQC_KEM::hqc1();
+            let (ek, dk) = hqc.keygen_from_seed(&seed_kem);
+
+            let kat_pk = parser.bytes_after("pk = ").unwrap().expect("");
+            let kat_sk = parser.bytes_after("sk = ").unwrap().expect("");
+
+            assert_eq!(ek.data, kat_pk);
+            assert_eq!(dk.data, kat_sk);
+
+            let kat_ct = parser.bytes_after("ct = ").unwrap().expect("");
+            let kat_ss = parser.bytes_after("ss = ").unwrap().expect("");
+
+            let m = test_xof.get_bytes(hqc.k());
+            let salt = test_xof.get_bytes(hqc.salt_bytes());
+
+            let (shared_secret, c_kem) = hqc.encaps_from_m_salt(&ek, &m, &salt);
+
+            assert_eq!(c_kem.data, kat_ct);
+            assert_eq!(shared_secret, kat_ss);
+
+            if count == "99" {
+                break;
+            }
+        }
+    }
+
+    #[test]
+    fn hqc3_kat1() {
+        println!("HQC-3 KATs test");
+
+        let mut parser = KATParser::new("kats/hqc-3/PQCkemKAT_4602.rsp").expect("");
+
+        let count = parser.line_after("count = ").unwrap().expect("");
+        println!("count: {}", count);
+
+        let seed_bytes = parser.line_after("seed = ").unwrap().expect("");
+        println!("seed: {}", seed_bytes);
+        let seed = KATParser::hex_to_bytes(&seed_bytes);
+
+        let mut test_xof = XOF::new_prng(&seed);
+        let seed_kem = test_xof.get_bytes(HQC_KEM::SEED_BYTES);
+
+        let hqc = HQC_KEM::hqc3();
+        let (ek, dk) = hqc.keygen_from_seed(&seed_kem);
+
+        let kat_pk = parser.bytes_after("pk = ").unwrap().expect("");
+        let kat_sk = parser.bytes_after("sk = ").unwrap().expect("");
+
+        assert_eq!(ek.data, kat_pk);
+        assert_eq!(dk.data, kat_sk);
+
+        let kat_ct = parser.bytes_after("ct = ").unwrap().expect("");
+        let kat_ss = parser.bytes_after("ss = ").unwrap().expect("");
+
+        let m = test_xof.get_bytes(hqc.k());
+        let salt = test_xof.get_bytes(hqc.salt_bytes());
+
+        let (shared_secret, c_kem) = hqc.encaps_from_m_salt(&ek, &m, &salt);
+
+        assert_eq!(c_kem.data, kat_ct);
+        assert_eq!(shared_secret, kat_ss);
+    }
+
+    #[test]
+    #[ignore]
+    fn hqc3_kats() {
+        println!("HQC-3 KATs test");
+
+        let mut parser = KATParser::new("kats/hqc-3/PQCkemKAT_4602.rsp").expect("");
+
+        loop {
+            let count = parser.line_after("count = ").unwrap().expect("");
+            println!("count: {}", count);
+
+            let seed_bytes = parser.line_after("seed = ").unwrap().expect("");
+            println!("seed: {}", seed_bytes);
+            let seed = KATParser::hex_to_bytes(&seed_bytes);
+
+            let mut test_xof = XOF::new_prng(&seed);
+            let seed_kem = test_xof.get_bytes(HQC_KEM::SEED_BYTES);
+
+            let hqc = HQC_KEM::hqc3();
+            let (ek, dk) = hqc.keygen_from_seed(&seed_kem);
+
+            let kat_pk = parser.bytes_after("pk = ").unwrap().expect("");
+            let kat_sk = parser.bytes_after("sk = ").unwrap().expect("");
+
+            assert_eq!(ek.data, kat_pk);
+            assert_eq!(dk.data, kat_sk);
+
+            let kat_ct = parser.bytes_after("ct = ").unwrap().expect("");
+            let kat_ss = parser.bytes_after("ss = ").unwrap().expect("");
+
+            let m = test_xof.get_bytes(hqc.k());
+            let salt = test_xof.get_bytes(hqc.salt_bytes());
+
+            let (shared_secret, c_kem) = hqc.encaps_from_m_salt(&ek, &m, &salt);
+
+            assert_eq!(c_kem.data, kat_ct);
+            assert_eq!(shared_secret, kat_ss);
+
+            if count == "99" {
+                break;
+            }
+        }
+    }
+
+    #[test]
+    fn hqc5_kat1() {
+        println!("HQC-5 KATs test");
+
+        let mut parser = KATParser::new("kats/hqc-5/PQCkemKAT_7333.rsp").expect("");
+
+        let count = parser.line_after("count = ").unwrap().expect("");
+        println!("count: {}", count);
+
+        let seed_bytes = parser.line_after("seed = ").unwrap().expect("");
+        println!("seed: {}", seed_bytes);
+        let seed = KATParser::hex_to_bytes(&seed_bytes);
+
+        let mut test_xof = XOF::new_prng(&seed);
+        let seed_kem = test_xof.get_bytes(HQC_KEM::SEED_BYTES);
+
+        let hqc = HQC_KEM::hqc5();
+        let (ek, dk) = hqc.keygen_from_seed(&seed_kem);
+
+        let kat_pk = parser.bytes_after("pk = ").unwrap().expect("");
+        let kat_sk = parser.bytes_after("sk = ").unwrap().expect("");
+
+        assert_eq!(ek.data, kat_pk);
+        assert_eq!(dk.data, kat_sk);
+
+        let kat_ct = parser.bytes_after("ct = ").unwrap().expect("");
+        let kat_ss = parser.bytes_after("ss = ").unwrap().expect("");
+
+        let m = test_xof.get_bytes(hqc.k());
+        let salt = test_xof.get_bytes(hqc.salt_bytes());
+
+        let (shared_secret, c_kem) = hqc.encaps_from_m_salt(&ek, &m, &salt);
+
+        assert_eq!(c_kem.data, kat_ct);
+        assert_eq!(shared_secret, kat_ss);
+    }
+
+    #[test]
+    #[ignore]
+    fn hqc5_kats() {
+        println!("HQC-5 KATs test");
+
+        let mut parser = KATParser::new("kats/hqc-5/PQCkemKAT_7333.rsp").expect("");
+
+        loop {
+            let count = parser.line_after("count = ").unwrap().expect("");
+            println!("count: {}", count);
+
+            let seed_bytes = parser.line_after("seed = ").unwrap().expect("");
+            println!("seed: {}", seed_bytes);
+            let seed = KATParser::hex_to_bytes(&seed_bytes);
+
+            let mut test_xof = XOF::new_prng(&seed);
+            let seed_kem = test_xof.get_bytes(HQC_KEM::SEED_BYTES);
+
+            let hqc = HQC_KEM::hqc5();
+            let (ek, dk) = hqc.keygen_from_seed(&seed_kem);
+
+            let kat_pk = parser.bytes_after("pk = ").unwrap().expect("");
+            let kat_sk = parser.bytes_after("sk = ").unwrap().expect("");
+
+            assert_eq!(ek.data, kat_pk);
+            assert_eq!(dk.data, kat_sk);
+
+            let kat_ct = parser.bytes_after("ct = ").unwrap().expect("");
+            let kat_ss = parser.bytes_after("ss = ").unwrap().expect("");
+
+            let m = test_xof.get_bytes(hqc.k());
+            let salt = test_xof.get_bytes(hqc.salt_bytes());
+
+            let (shared_secret, c_kem) = hqc.encaps_from_m_salt(&ek, &m, &salt);
+
+            assert_eq!(c_kem.data, kat_ct);
+            assert_eq!(shared_secret, kat_ss);
+
+            if count == "99" {
+                break;
+            }
+        }
     }
 }
