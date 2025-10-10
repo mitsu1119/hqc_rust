@@ -5,7 +5,7 @@ use crate::{
 
 #[allow(non_camel_case_types)]
 pub struct HQC_PKE<'a> {
-    param: HQCParam<'a>,
+    pub param: HQCParam<'a>,
 }
 
 impl<'a> HQC_PKE<'a> {

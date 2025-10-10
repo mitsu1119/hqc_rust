@@ -48,6 +48,7 @@ pub struct HQCParam<'a> {
     pub rs_param: HQCRSParam<'a>,
     pub hadamard_multiplicity: u8,
     pub n: usize,
+    pub k: usize,
     pub omega: u8,
     pub omega_re: u8,
     pub n1n2: usize,
@@ -59,6 +60,7 @@ impl<'a> HQCParam<'a> {
             rs_param: HQCRSParam::new_rss1(),
             hadamard_multiplicity: 3,
             n: 17669,
+            k: 16,
             omega: 66,
             omega_re: 75,
             n1n2: 17664,
@@ -72,6 +74,7 @@ impl<'a> HQCParam<'a> {
             omega: 100,
             omega_re: 114,
             n: 35851,
+            k: 24,
             n1n2: 35840,
         }
     }
@@ -83,6 +86,7 @@ impl<'a> HQCParam<'a> {
             omega: 131,
             omega_re: 149,
             n: 57637,
+            k: 32,
             n1n2: 57600,
         }
     }
