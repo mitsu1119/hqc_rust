@@ -8,7 +8,17 @@ pub struct XOF {
 }
 
 impl XOF {
+    const HQC_PRNG_DOMAIN: u8 = 0;
     const HQC_XOF_DOMAIN: u8 = 1;
+
+    pub fn new_prng(seed: &[u8]) -> Self {
+        let mut ctx = Shake256::default();
+        ctx.update(seed);
+        ctx.update(&[Self::HQC_PRNG_DOMAIN]);
+        Self {
+            reader: ctx.finalize_xof(),
+        }
+    }
 
     pub fn new(seed: &[u8]) -> Self {
         let mut ctx = Shake256::default();

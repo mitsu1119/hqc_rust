@@ -126,7 +126,10 @@ impl<'a> HQC_KEM<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{hqc::hqc_kem::HQC_KEM, util::kat_parser::KATParser};
+    use crate::{
+        hqc::{hqc_kem::HQC_KEM, xof::XOF},
+        util::kat_parser::KATParser,
+    };
 
     #[test]
     fn hqc1_kats() {
@@ -141,7 +144,16 @@ mod tests {
         println!("seed: {}", seed_bytes);
         let seed = KATParser::hex_to_bytes(&seed_bytes);
 
+        let mut test_xof = XOF::new_prng(&seed);
+        let seed_kem = test_xof.get_bytes(HQC_KEM::SEED_BYTES);
+
         let hqc = HQC_KEM::hqc1();
-        let (ek, dk) = hqc.keygen_from_seed(&seed);
+        let (ek, dk) = hqc.keygen_from_seed(&seed_kem);
+
+        let kat_pk = parser.bytes_after("pk = ").unwrap().expect("");
+        let kat_sk = parser.bytes_after("sk = ").unwrap().expect("");
+
+        assert_eq!(ek.data, kat_pk);
+        assert_eq!(dk.data, kat_sk);
     }
 }
