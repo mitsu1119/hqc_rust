@@ -1,53 +1,9 @@
-use crate::hqc::{hqc_param::HQCParam, hqc_pke::HQC_PKE, xof::XOF};
-
-#[derive(Debug)]
-pub struct EncryptionKeyKEM {
-    data: Vec<u8>,
-    seed_len: usize,
-}
-
-impl EncryptionKeyKEM {
-    pub fn new(data: Vec<u8>, seed_len: usize) -> Self {
-        Self { data, seed_len }
-    }
-    pub fn seed_pke(&self) -> &[u8] {
-        &self.data[..self.seed_len]
-    }
-    pub fn s(&self) -> &[u8] {
-        &self.data[self.seed_len..]
-    }
-}
-
-#[derive(Debug)]
-pub struct DecryptionKeyKEM {
-    data: Vec<u8>,
-    ek_size: usize,
-    dk_size: usize,
-    k: usize,
-}
-
-impl DecryptionKeyKEM {
-    pub fn new(data: Vec<u8>, ek_size: usize, dk_size: usize, k: usize) -> Self {
-        Self {
-            data,
-            ek_size,
-            dk_size,
-            k,
-        }
-    }
-    pub fn ek_kem(&self) -> &[u8] {
-        &self.data[..self.ek_size]
-    }
-    pub fn dk_pke(&self) -> &[u8] {
-        &self.data[self.ek_size..self.ek_size + self.dk_size]
-    }
-    pub fn sigma(&self) -> &[u8] {
-        &self.data[self.ek_size + self.dk_size..self.ek_size + self.dk_size + self.k]
-    }
-    pub fn seed_kem(&self) -> &[u8] {
-        &self.data[self.ek_size + self.dk_size + self.k..]
-    }
-}
+use crate::hqc::{
+    hqc_kem_data::{DecryptionKeyKEM, EncryptionKeyKEM},
+    hqc_param::HQCParam,
+    hqc_pke::HQC_PKE,
+    xof::XOF,
+};
 
 #[allow(non_camel_case_types)]
 pub struct HQC_KEM<'a> {
