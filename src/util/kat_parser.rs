@@ -36,7 +36,7 @@ impl<'a> KATParser {
         }
     }
 
-    fn hex_to_bytes(s: &'a str) -> Vec<u8> {
+    pub fn hex_to_bytes(s: &'a str) -> Vec<u8> {
         assert_eq!(s.len() & 1, 0);
         let mut out = Vec::with_capacity(s.len() >> 1);
         for i in (0..s.len()).step_by(2) {

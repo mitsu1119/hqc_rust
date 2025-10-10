@@ -126,22 +126,22 @@ impl<'a> HQC_KEM<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::hqc::hqc_kem::HQC_KEM;
+    use crate::{hqc::hqc_kem::HQC_KEM, util::kat_parser::KATParser};
 
     #[test]
-    fn keygen_from_seed_hqc1() {
-        let seed = [
-            158, 248, 119, 253, 219, 232, 137, 28, 110, 78, 121, 234, 240, 34, 229, 99, 222, 250,
-            202, 107, 21, 33, 97, 185, 164, 35, 232, 254, 150, 164, 3, 231,
-        ];
+    fn hqc1_kats() {
+        println!("HQC-1 KATs test");
+
+        let mut parser = KATParser::new("kats/hqc-1/PQCkemKAT_2321.rsp").expect("");
+
+        let count = parser.line_after("count = ").unwrap().expect("");
+        println!("count: {}", count);
+
+        let seed_bytes = parser.line_after("seed = ").unwrap().expect("");
+        println!("seed: {}", seed_bytes);
+        let seed = KATParser::hex_to_bytes(&seed_bytes);
+
         let hqc = HQC_KEM::hqc1();
-        let (ek, dk) = hqc.keygen_from_seed(seed);
-
-        println!("{:x?}\n", dk.ek_kem());
-        println!("{:x?}\n", dk.dk_pke());
-        println!("{:x?}\n", dk.sigma());
-        println!("{:x?}\n", dk.seed_kem());
-
-        panic!();
+        // let (ek, dk) = hqc.keygen_from_seed(seed);
     }
 }
