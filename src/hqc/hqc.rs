@@ -48,6 +48,48 @@ impl<'a> HQC_PKE<'a> {
         }
     }
 
+    // x[base..base+len)
+    fn bits_slice(x: &Vec<u8>, base: usize, len: usize) -> Vec<u8> {
+        let mut res = vec![0u8; len.div_ceil(8)];
+        for i in 0..len {
+            if Self::get_bit_from_bitvec(x, base + i) == 1 {
+                Self::bit_flip_in_bitvec(&mut res, i);
+            }
+        }
+        res
+    }
+
+    // nbits a ^ b
+    fn bits_xor(n: usize, a: &Vec<u8>, b: &Vec<u8>) -> Vec<u8> {
+        let mut res = vec![0u8; n.div_ceil(8)];
+        for i in 0..n {
+            let left = if i < a.len() * 8 {
+                Self::get_bit_from_bitvec(a, i)
+            } else {
+                0
+            };
+            let right = if i < b.len() * 8 {
+                Self::get_bit_from_bitvec(b, i)
+            } else {
+                0
+            };
+            if left ^ right == 1 {
+                Self::bit_flip_in_bitvec(&mut res, i);
+            }
+        }
+        res
+    }
+
+    // a ^= (b << shift)
+    fn bits_shift_xor(a: &mut Vec<u8>, b: &Vec<u8>, shift: usize) {
+        let n = b.len() * 8;
+        for i in 0..n {
+            if Self::get_bit_from_bitvec(b, i) == 1 {
+                Self::bit_flip_in_bitvec(a, i + shift);
+            }
+        }
+    }
+
     fn vec_mul_schoolbook(n: usize, a: &Vec<u8>, b: &Vec<u8>) -> Vec<u8> {
         let mut res = vec![0u8; (n * 2).div_ceil(8)];
         for i in 0..n {
@@ -63,14 +105,49 @@ impl<'a> HQC_PKE<'a> {
         res
     }
 
+    const SCHOOLBOOK_BITS: usize = 256;
+    fn vec_mul_karatsuba(n: usize, a: &Vec<u8>, b: &Vec<u8>) -> Vec<u8> {
+        if n == 0 {
+            return vec![];
+        }
+        if n <= Self::SCHOOLBOOK_BITS {
+            return Self::vec_mul_schoolbook(n, a, b);
+        }
+
+        let n0 = n >> 1;
+        let n1 = n - n0;
+        let a0 = Self::bits_slice(a, 0, n0);
+        let a1 = Self::bits_slice(a, n >> 1, n1);
+        let b0 = Self::bits_slice(b, 0, n0);
+        let b1 = Self::bits_slice(b, n >> 1, n1);
+
+        let z0 = Self::vec_mul_karatsuba(n0, &a0, &b0);
+        let z2 = Self::vec_mul_karatsuba(n1, &a1, &b1);
+
+        // (a0 + a1) * (b0 + b1) + z0 + z2
+        let l = n0.max(n1);
+        let x = Self::bits_xor(l, &a0, &a1);
+        let y = Self::bits_xor(l, &b0, &b1);
+        let mut z1 = Self::vec_mul_karatsuba(l, &x, &y);
+        Self::bits_shift_xor(&mut z1, &z0, 0);
+        Self::bits_shift_xor(&mut z1, &z2, 0);
+
+        // z0 + (z1 << n0) + (z2 << n0)
+        let mut res = vec![0u8; (2 * n).div_ceil(8)];
+        Self::bits_shift_xor(&mut res, &z0, 0);
+        Self::bits_shift_xor(&mut res, &z1, n0);
+        Self::bits_shift_xor(&mut res, &z2, 2 * n0);
+
+        res
+    }
+
     fn vec_mul(&self, u: Vec<u8>, v: Vec<u8>) -> Vec<u8> {
         let mut u = u;
         let mut v = v;
         Self::n_bits_align(&mut u, self.param.n);
         Self::n_bits_align(&mut v, self.param.n);
 
-        let mulmul = Self::vec_mul_schoolbook(self.param.n, &u, &v);
-
+        let mulmul = Self::vec_mul_karatsuba(self.param.n, &u, &v);
         // mod x^n - 1
         let mut res = vec![0u8; self.param.n.div_ceil(8)];
         for i in 0..self.param.n {
@@ -148,7 +225,7 @@ impl<'a> HQC_PKE<'a> {
     // SampleFixedWeightVect
     // non-rejection sampling but small bias
     fn sample_fixed_weight_vect_indices(&self, ctx: &mut XOF, weight: u8) -> Vec<usize> {
-        let mut rand = ctx.get_bytes(4 * weight as usize);
+        let rand = ctx.get_bytes(4 * weight as usize);
         let mut res = vec![0; weight as usize];
 
         for i in 0..weight {

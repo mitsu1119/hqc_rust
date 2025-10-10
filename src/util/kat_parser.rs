@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, BufRead, BufReader, Error},
+    io::{self, BufRead, BufReader},
 };
 
 #[derive(Debug)]
