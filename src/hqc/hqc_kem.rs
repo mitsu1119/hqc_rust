@@ -1,5 +1,6 @@
 use crate::hqc::{
-    hqc_kem_data::{DecryptionKeyKEM, EncryptionKeyKEM},
+    hqc_hash::HQCHash,
+    hqc_kem_data::{CiphertextKEM, DecryptionKeyKEM, EncryptionKeyKEM},
     hqc_param::HQCParam,
     hqc_pke::HQC_PKE,
     xof::XOF,
@@ -12,6 +13,7 @@ pub struct HQC_KEM<'a> {
 
 impl<'a> HQC_KEM<'a> {
     const SEED_BYTES: usize = 32;
+    const SHARED_SECRET_BYTES: usize = 32;
 
     pub fn new(param: HQCParam<'a>) -> Self {
         Self {
@@ -29,6 +31,13 @@ impl<'a> HQC_KEM<'a> {
 
     pub fn hqc5() -> Self {
         Self::new(HQCParam::hqc5())
+    }
+
+    fn k(&self) -> usize {
+        self.pke.param.k
+    }
+    fn salt_bytes(&self) -> usize {
+        16
     }
 
     pub fn keygen_from_seed(&self, seed_kem: &[u8]) -> (EncryptionKeyKEM, DecryptionKeyKEM) {
@@ -67,6 +76,50 @@ impl<'a> HQC_KEM<'a> {
             EncryptionKeyKEM::new(ek_kem, Self::SEED_BYTES),
             DecryptionKeyKEM::new(dk_kem.0, dk_kem.1, dk_kem.2, dk_kem.3),
         );
+    }
+
+    pub fn encaps_from_m_salt(
+        &self,
+        ek_kem: &EncryptionKeyKEM,
+        m: &[u8],
+        salt: &[u8],
+    ) -> (Vec<u8>, CiphertextKEM) {
+        let k_theta = {
+            let mut h = HQCHash::H(&ek_kem.data).to_vec();
+            let len = h.len();
+            h.reserve(m.len() + salt.len());
+            h.resize(len + m.len() + salt.len(), 0);
+            h[len..len + m.len()].copy_from_slice(&m);
+            h[len + m.len()..].copy_from_slice(&salt);
+            HQCHash::G(&h)
+        };
+
+        let (shared_secret, theta) = {
+            let mut shared_secret = vec![0; Self::SHARED_SECRET_BYTES];
+            let mut theta = vec![0; k_theta.len() - Self::SHARED_SECRET_BYTES];
+
+            shared_secret.copy_from_slice(&k_theta[..Self::SHARED_SECRET_BYTES]);
+            theta.copy_from_slice(&k_theta[Self::SHARED_SECRET_BYTES..]);
+
+            (shared_secret, theta)
+        };
+
+        let seed_pke: [u8; 32] = ek_kem.seed_pke().clone().try_into().unwrap();
+        let s = ek_kem.s().clone().to_vec();
+        let c_pke = self.pke.encrypt((seed_pke, s), m.to_vec(), &theta);
+
+        let c_kem = {
+            let mut c_kem = c_pke.0;
+            let len = c_kem.len();
+            let c_len = len + c_pke.1.len();
+            c_kem.reserve(c_pke.1.len() + salt.len());
+            c_kem.resize(len + c_pke.1.len() + salt.len(), 0);
+            c_kem[len..len + c_pke.1.len()].copy_from_slice(&c_pke.1);
+            c_kem[len + c_pke.1.len()..].copy_from_slice(salt);
+            CiphertextKEM::new(c_kem, c_len)
+        };
+
+        (shared_secret, c_kem)
     }
 
     pub fn keygen(&self) -> (EncryptionKeyKEM, DecryptionKeyKEM) {
@@ -111,5 +164,16 @@ mod tests {
 
         assert_eq!(ek.data, kat_pk);
         assert_eq!(dk.data, kat_sk);
+
+        let kat_ct = parser.bytes_after("ct = ").unwrap().expect("");
+        let kat_ss = parser.bytes_after("ss = ").unwrap().expect("");
+
+        let m = test_xof.get_bytes(hqc.k());
+        let salt = test_xof.get_bytes(hqc.salt_bytes());
+
+        let (shared_secret, c_kem) = hqc.encaps_from_m_salt(&ek, &m, &salt);
+
+        assert_eq!(c_kem.data, kat_ct);
+        assert_eq!(shared_secret, kat_ss);
     }
 }
