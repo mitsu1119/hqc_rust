@@ -39,20 +39,52 @@ impl<'a> HQC_PKE<'a> {
         bits[index] ^= mask;
     }
 
-    fn vec_mul(&self, u: Vec<u8>, v: Vec<u8>) -> Vec<u8> {
-        let mut res = vec![0u8; u.len()];
-        for i in 0..self.param.n {
-            for j in 0..self.param.n {
-                let k = (i + j) % self.param.n;
-                let ui = Self::get_bit_from_bitvec(&u, i);
-                let vj = Self::get_bit_from_bitvec(&v, j);
-                let uv = ui & vj;
-                if uv == 0 {
-                    continue;
-                }
-                Self::bit_flip_in_bitvec(&mut res, k);
+    fn n_bits_align(x: &mut Vec<u8>, n: usize) {
+        x.resize(n.div_ceil(8), 0u8);
+        if (n & 0b111) != 0 {
+            if let Some(last) = x.last_mut() {
+                *last &= (1u8 << (n & 0b111)) - 1;
             }
         }
+    }
+
+    fn vec_mul_schoolbook(n: usize, a: &Vec<u8>, b: &Vec<u8>) -> Vec<u8> {
+        let mut res = vec![0u8; (n * 2).div_ceil(8)];
+        for i in 0..n {
+            if Self::get_bit_from_bitvec(a, i) == 0 {
+                continue;
+            }
+            for j in 0..n {
+                if Self::get_bit_from_bitvec(b, j) == 1 {
+                    Self::bit_flip_in_bitvec(&mut res, i + j);
+                }
+            }
+        }
+        res
+    }
+
+    fn vec_mul(&self, u: Vec<u8>, v: Vec<u8>) -> Vec<u8> {
+        let mut u = u;
+        let mut v = v;
+        Self::n_bits_align(&mut u, self.param.n);
+        Self::n_bits_align(&mut v, self.param.n);
+
+        let mulmul = Self::vec_mul_schoolbook(self.param.n, &u, &v);
+
+        // mod x^n - 1
+        let mut res = vec![0u8; self.param.n.div_ceil(8)];
+        for i in 0..self.param.n {
+            if Self::get_bit_from_bitvec(&mulmul, i) == 1 {
+                Self::bit_flip_in_bitvec(&mut res, i);
+            }
+        }
+        for i in self.param.n..(2 * self.param.n).min(mulmul.len() * 8) {
+            if Self::get_bit_from_bitvec(&mulmul, i) == 1 {
+                Self::bit_flip_in_bitvec(&mut res, i - self.param.n);
+            }
+        }
+        Self::n_bits_align(&mut res, self.param.n);
+
         res
     }
 
